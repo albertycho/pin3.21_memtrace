@@ -1,1 +1,8 @@
 *memtrace.out.*
+*inscount.out*
+*pin.log*
+*/obj-intel64
+*/obj-intel64*
+*/obj-intel64/*
+*obj-intel64/*
+*pintool.log*

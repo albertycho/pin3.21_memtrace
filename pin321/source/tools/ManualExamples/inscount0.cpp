@@ -24,8 +24,10 @@ VOID docount() { icount++; }
 // Pin calls this function every time a new instruction is encountered
 VOID Instruction(INS ins, VOID* v)
 {
+    if(INS_Valid(ins)){
     // Insert a call to docount before every instruction, no arguments are passed
     INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)docount, IARG_END);
+    }
 }
 
 KNOB< string > KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "inscount.out", "specify output file name");

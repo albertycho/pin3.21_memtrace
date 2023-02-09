@@ -16,10 +16,6 @@ typedef UINT32 CACHE_STATS; // type of cache hit/miss counters
 
 #include "pin_cache.H"
 
-FILE * trace;
-KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "l3trace.out", "specify output file name");
-
-
 namespace ITLB
 {
 // instruction TLB: 4 kB pages, 32 entries, fully associative
@@ -126,21 +122,13 @@ static VOID Fini(int code, VOID* v)
     std::cout << "Fini finished"<<std::endl;
 }
 
-static VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType)
-{
-    const BOOL ul3hit = ul3.Access(addr, size, accessType);
-    if(!ul3hit){
-        fprintf(trace, "%p\n", (void *)addr);
-    }
-}
 static VOID Ul2Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType)
 {
     // second level unified cache
     const BOOL ul2Hit = ul2.Access(addr, size, accessType);
 
     // third level unified cache
-    //if (!ul2Hit) ul3.Access(addr, size, accessType);
-    if (!ul2Hit) Ul3Access(addr, size, accessType);
+    if (!ul2Hit) ul3.Access(addr, size, accessType);
 }
 
 static VOID InsRef(ADDRINT addr)
@@ -181,13 +169,9 @@ static VOID MemRefSingle(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE acce
     // second level unified Cache
     if (!dl1Hit) Ul2Access(addr, size, accessType);
 }
-uint64_t ins_count=0;
+
 static VOID Instruction(INS ins, VOID* v)
 {
-    ins_count++;
-    if(ins_count % 10000==0){
-    std::cout<<"ins_count: "<<ins_count/10000<<"*10k"<<std::endl;
-    }
     // all instruction fetches access I-cache
     INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)InsRef, IARG_INST_PTR, IARG_END);
 
@@ -237,7 +221,6 @@ extern int main(int argc, char* argv[])
 {
     PIN_Init(argc, argv);
 
-    trace = fopen(KnobOutputFile.Value().c_str(), "w");
     INS_AddInstrumentFunction(Instruction, 0);
     PIN_AddFiniFunction(Fini, 0);
 

@@ -548,20 +548,10 @@ void SCRATCH_TRACE_HEADER::RecordLogImmediate(INS ins, IARG_TYPE itype)
 #endif
 }
 
-uint64_t ins_count=0;
 void InstrumentBBL(BBL bbl, SCRATCH_TRACE_HEADER* theader)
 {
     for (INS ins = BBL_InsHead(bbl); INS_Valid(ins); ins = INS_Next(ins))
     {
-        ins_count++;
-        //std::cout<<"i wanna see this gets exectued"<<std::endl;
-        
-        //if(ins_count<100000){
-        //    continue;
-        //}
-        if(ins_count % 10000==0){
-            std::cout<<"ins_count: "<<ins_count/10000<<"M/100"<<std::endl;
-        }
         // Log every memory references of the instruction
         if (INS_IsMemoryRead(ins) && INS_IsStandardMemop(ins))
         {

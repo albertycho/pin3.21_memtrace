@@ -68,7 +68,7 @@ static UL3::CACHE ul3("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::as
 
 static inline VOID dump_tbuf(THREADID tid) { //TODO add threaID to arg  
     //added this as an optimization, but doesn't seem to save runtime much :(
-    uint64_t tmp_tbi=tb_i[tid]
+    uint64_t tmp_tbi = tb_i[tid];
     for (uint64_t i = 0; i < tmp_tbi; i++) {
         fprintf(trace[tid], "%p\n", (void*)(t_buf[tid][i]));
     }

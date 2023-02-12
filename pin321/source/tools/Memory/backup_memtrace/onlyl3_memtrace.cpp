@@ -23,7 +23,6 @@ uint64_t ins_count=0;
 uint64_t ins_count_2=0;
 uint64_t memref_single_count=0;
 uint64_t memref_multi_count=0;
-uint64_t num_maccess=0;
 
 namespace ITLB
 {
@@ -117,18 +116,17 @@ static VOID Fini(int code, VOID* v)
 {
     //std::cerr << itlb;
     //std::cerr << dtlb;
-    //std::cerr << il1;
-    //std::cerr << dl1;
-    //std::cerr << ul2;
-    //std::cerr << ul3;
+    std::cerr << il1;
+    std::cerr << dl1;
+    std::cerr << ul2;
+    std::cerr << ul3;
 
-    ////std::cout << itlb;
-    ////std::cout << dtlb;
-    //std::cout << il1;
-    //std::cout << dl1;
-    //std::cout << ul2;
-    //std::cout << ul3;
-    std::cout << "num mem accesses: "<<num_maccess <<std::endl;
+    //std::cout << itlb;
+    //std::cout << dtlb;
+    std::cout << il1;
+    std::cout << dl1;
+    std::cout << ul2;
+    std::cout << ul3;
     std::cout << "Fini finished"<<std::endl;
 }
 
@@ -136,7 +134,6 @@ static VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessT
 {
     const BOOL ul3hit = ul3.Access(addr, size, accessType);
     if(!ul3hit){
-        num_maccess++;
         fprintf(trace, "%p\n", (void *)addr);
     }
 }

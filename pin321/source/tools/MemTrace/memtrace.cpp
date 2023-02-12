@@ -67,6 +67,9 @@ KNOB< string > KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "memtrace.out
  */
 KNOB< BOOL > KnobEmitTrace(KNOB_MODE_WRITEONCE, "pintool", "emit", "0", "emit a trace in the output file");
 
+
+uint64_t ins_count=0;
+
 /*
  *
  *
@@ -436,6 +439,7 @@ ADDRINT MLOG::TraceAllocIf(char* logCursor, char* logEnd, ADDRINT size) { return
  */
 char* MLOG::TraceAllocThen(char* logCursor, ADDRINT size, THREADID tid)
 {
+    std::cout<<"TraceAllocThen"<<std::endl;
     MLOG* mlog = static_cast< MLOG* >(PIN_GetThreadData(mlog_key, tid));
 
     // If adding this trace will exceed the buffer size then flush the log
@@ -547,10 +551,11 @@ void SCRATCH_TRACE_HEADER::RecordLogImmediate(INS ins, IARG_TYPE itype)
     fprintf(stderr, "InsertLogImmediate ip %p\n", INS_Address(ins));
 #endif
 }
-
-uint64_t ins_count=0;
+//uint64_t instBBL_call_count=0;
 void InstrumentBBL(BBL bbl, SCRATCH_TRACE_HEADER* theader)
 {
+    //instBBL_call_count++;
+    //std::cout<< "instBBL_call_count " <<instBBL_call_count<<std::endl;
     for (INS ins = BBL_InsHead(bbl); INS_Valid(ins); ins = INS_Next(ins))
     {
         ins_count++;

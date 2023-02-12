@@ -19,6 +19,10 @@ typedef UINT32 CACHE_STATS; // type of cache hit/miss counters
 FILE * trace;
 KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "l3trace.out", "specify output file name");
 
+uint64_t ins_count=0;
+uint64_t ins_count_2=0;
+uint64_t memref_single_count=0;
+uint64_t memref_multi_count=0;
 
 namespace ITLB
 {
@@ -130,7 +134,7 @@ static VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessT
 {
     const BOOL ul3hit = ul3.Access(addr, size, accessType);
     if(!ul3hit){
-        fprintf(trace, "%p\n", (void *)addr);
+        //fprintf(trace, "%p\n", (void *)addr);
     }
 }
 static VOID Ul2Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType)
@@ -145,6 +149,11 @@ static VOID Ul2Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessT
 
 static VOID InsRef(ADDRINT addr)
 {
+    ins_count_2++;
+    if(ins_count_2 % 10000==0){
+    std::cout<<"ins_count_2: "<<ins_count_2/10000<<"*10k"<<std::endl;
+    }
+
     const UINT32 size                        = 1; // assuming access does not cross cache lines
     const CACHE_BASE::ACCESS_TYPE accessType = CACHE_BASE::ACCESS_TYPE_LOAD;
 
@@ -160,6 +169,22 @@ static VOID InsRef(ADDRINT addr)
 
 static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType)
 {
+    memref_multi_count++;
+    if(memref_multi_count % 10000==0){
+    std::cout<<"memref_multi_count : "<<memref_multi_count/10000<<"*10k"<<std::endl;
+    }
+
+    fprintf(trace, "%p\n", (void *)addr);
+    return;
+    for(UINT32 i=0;i<size;i++){
+      ADDRINT addr_i = addr + i*64;
+      fprintf(trace, "%p\n", (void *)addr_i);
+
+    }
+    return;
+    ////above is test code. TODO REMOVE
+    /*
+    //std::cout<<"in MemRefMulti, size: "<<size<<std::endl;
     // DTLB
     dtlb.AccessSingleLine(addr, CACHE_BASE::ACCESS_TYPE_LOAD);
 
@@ -168,10 +193,22 @@ static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE acces
 
     // second level unified Cache
     if (!dl1Hit) Ul2Access(addr, size, accessType);
+    */
 }
 
 static VOID MemRefSingle(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType)
 {
+    memref_single_count++;
+    if(memref_single_count % 10000==0){
+    std::cout<<"memref_single_count : "<<memref_single_count/10000<<"*10k"<<std::endl;
+    }
+
+
+    fprintf(trace, "%p\n", (void *)addr);
+    return;
+    
+    ////above is test code. TODO REMOVE
+
     // DTLB
     dtlb.AccessSingleLine(addr, CACHE_BASE::ACCESS_TYPE_LOAD);
 
@@ -181,7 +218,6 @@ static VOID MemRefSingle(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE acce
     // second level unified Cache
     if (!dl1Hit) Ul2Access(addr, size, accessType);
 }
-uint64_t ins_count=0;
 static VOID Instruction(INS ins, VOID* v)
 {
     ins_count++;

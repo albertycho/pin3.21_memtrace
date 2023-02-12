@@ -220,7 +220,7 @@ extern int main(int argc, char* argv[])
 
     trace = fopen(KnobOutputFile.Value().c_str(), "w");
     INS_AddInstrumentFunction(Instruction, 0);
-    //PIN_AddFiniFunction(Fini, 0);
+    PIN_AddFiniFunction(Fini, 0);
     
     PIN_AddThreadStartFunction(ThreadStart, 0);
     PIN_AddThreadFiniFunction(ThreadFini, 0);

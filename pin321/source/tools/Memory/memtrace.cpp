@@ -31,7 +31,7 @@ uint64_t num_maccess[MAX_THREADS] = {};
 //uint64_t t_buf[TBUF_SIZE];
 //uint64_t tb_i = 0;
 uint64_t t_buf[MAX_THREADS][TBUF_SIZE];
-uint64_t tb_i[MAX_THREADS] = 0;
+uint64_t tb_i[MAX_THREADS] = {};
 
 uint64_t numThreads = 0;
 

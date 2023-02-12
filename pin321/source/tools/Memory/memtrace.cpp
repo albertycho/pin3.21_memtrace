@@ -49,7 +49,10 @@ const UINT32 max_associativity = associativity;
 
 typedef CACHE_ROUND_ROBIN(max_sets, max_associativity, allocation) CACHE;
 } // namespace IL1
-static IL1::CACHE il1("L1 Instruction Cache", IL1::cacheSize, IL1::lineSize, IL1::associativity);
+//static IL1::CACHE il1("L1 Instruction Cache", IL1::cacheSize, IL1::lineSize, IL1::associativity);
+//static IL1::CACHE *il1=new IL1::CACHE("L1 Instruction Cache", IL1::cacheSize, IL1::lineSize, IL1::associativity);
+static IL1::CACHE *il1[MAX_THREADS];
+
 
 
 namespace UL3
@@ -64,7 +67,10 @@ const UINT32 max_sets = cacheSize / (lineSize * associativity);
 
 typedef CACHE_DIRECT_MAPPED(max_sets, allocation) CACHE;
 } // namespace UL3
-static UL3::CACHE ul3("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::associativity);
+//static UL3::CACHE ul3("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::associativity);
+static UL3::CACHE *ul3[MAX_THREADS];
+
+
 
 static inline VOID dump_tbuf(THREADID tid) { //TODO add threaID to arg  
     //added this as an optimization, but doesn't seem to save runtime much :(
@@ -99,7 +105,7 @@ static inline VOID recordAccess(ADDRINT addr, THREADID tid) { //TODO add threaID
 
 static inline VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid) ////TODO add threaID to arg
 {
-    const BOOL ul3hit = ul3.Access(addr, size, accessType);
+    const BOOL ul3hit = ul3[tid]->Access(addr, size, accessType);
     if(!ul3hit){
         recordAccess(addr, tid);
     }
@@ -121,7 +127,8 @@ static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
     const CACHE_BASE::ACCESS_TYPE accessType = CACHE_BASE::ACCESS_TYPE_LOAD;
 
     //// first level I-cache (Got rid of l1/l2 for data cache, keeping IL1
-    const BOOL il1Hit = il1.AccessSingleLine(addr, accessType);
+    //const BOOL il1Hit = il1.AccessSingleLine(addr, accessType);
+    const BOOL il1Hit = il1[tid]->AccessSingleLine(addr, accessType);
     if (!il1Hit) Ul3Access(addr, size, accessType, tid);
 
 }
@@ -218,6 +225,9 @@ VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) {
     std::ostringstream tfname;
     tfname << "memtrace_t" << tid << ".out";
     trace[tid] = fopen(tfname.str().c_str(), "w");
+
+    il1[tid] = new IL1::CACHE("L1 Instruction Cache", IL1::cacheSize, IL1::lineSize, IL1::associativity);
+    ul3[tid] = new UL3::CACHE("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::associativity);
 }
 
 extern int main(int argc, char* argv[])

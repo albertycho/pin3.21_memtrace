@@ -62,12 +62,17 @@ static VOID Fini(int code, VOID* v)
     std::cout << "Fini finished"<<std::endl;
 }
 
+static VOID recordAccess(ADDRINT addr) {
+    num_maccess++;
+    fprintf(trace, "%p\n", (void*)addr);
+    
+}
+
 static VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType)
 {
     const BOOL ul3hit = ul3.Access(addr, size, accessType);
     if(!ul3hit){
-        num_maccess++;
-        fprintf(trace, "%p\n", (void *)addr);
+        recordAccess(addr);
     }
 }
 

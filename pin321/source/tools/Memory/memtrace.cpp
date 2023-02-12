@@ -16,8 +16,9 @@ typedef UINT32 CACHE_STATS; // type of cache hit/miss counters
 
 #include "pin_cache.H"
 
-FILE * trace;
-KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "memtrace.out", "specify output file name");
+#define MAX_THREADS 64
+FILE * trace[MAX_THREADS];
+//KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "memtrace.out", "specify output file name");
 
 uint64_t ins_count=0;
 uint64_t memref_single_count=0;
@@ -65,7 +66,7 @@ static UL3::CACHE ul3("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::as
 static inline VOID dump_tbuf(THREADID tid) { //TODO add threaID to arg  
     //added this as an optimization, but doesn't seem to save runtime much :(
     for (uint64_t i = 0; i < tb_i; i++) {
-        fprintf(trace, "%p\n", (void*)(t_buf[i]));
+        fprintf(trace[tid], "%p\n", (void*)(t_buf[i]));
     }
     tb_i = 0;
 }
@@ -109,7 +110,7 @@ static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
         std::cout<<"thread_"<<tid << " ins_count: " << ins_count / 1000 << " K" << std::endl;
         //Mark timestamp in the trace file
         dump_tbuf(tid);
-        fprintf(trace, "CYCLE_COUNT %ld\n", ins_count);
+        fprintf(trace[tid], "CYCLE_COUNT %ld\n", ins_count);
     }
 
     const UINT32 size                        = 1; // assuming access does not cross cache lines
@@ -209,16 +210,18 @@ static VOID Instruction(INS ins, VOID* v)
     }
 }
 
-VOID ThreadStart(THREADID threadid, CONTEXT* ctxt, INT32 flags, VOID* v) { 
-    std::cout << "thread_" << threadid << " start" << std::endl;
+VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) { 
+    std::cout << "thread_" << tid<< " start" << std::endl;
     numThreads++; 
+    std::string tfname = "memtrace_t" << tid << ".out";
+    trace[tid] = fopen(tfname, "w");
 }
 
 extern int main(int argc, char* argv[])
 {
     PIN_Init(argc, argv);
 
-    trace = fopen(KnobOutputFile.Value().c_str(), "w");
+    //trace = fopen(KnobOutputFile.Value().c_str(), "w");
     INS_AddInstrumentFunction(Instruction, 0);
     PIN_AddFiniFunction(Fini, 0);
     

@@ -9,7 +9,8 @@
  */
 
 #include <iostream>
-
+#include <string>
+#include <sstream>
 #include "pin.H"
 
 typedef UINT32 CACHE_STATS; // type of cache hit/miss counters
@@ -213,8 +214,10 @@ static VOID Instruction(INS ins, VOID* v)
 VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) { 
     std::cout << "thread_" << tid<< " start" << std::endl;
     numThreads++; 
-    std::string tfname = "memtrace_t" << tid << ".out";
-    trace[tid] = fopen(tfname, "w");
+    //std::string tfname = "memtrace_t" + std::to_string(tid) + ".out";
+    std::ostringstream tfname;
+    tfname << "memtrace_t" << tid << ".out";
+    trace[tid] = fopen(tfname.str().c_str(), "w");
 }
 
 extern int main(int argc, char* argv[])

@@ -101,7 +101,7 @@ static VOID InsRef(ADDRINT addr) //TODO add threaID to arg
         std::cout<<"ins_count: "<<ins_count/1000<<" K"<<std::endl;
         //Mark timestamp in the trace file
         dump_tbuf();
-        fprintf(trace, "CYCLE_COUNT %d\n", ins_count);
+        fprintf(trace, "CYCLE_COUNT %ld\n", ins_count);
     }
 
     const UINT32 size                        = 1; // assuming access does not cross cache lines

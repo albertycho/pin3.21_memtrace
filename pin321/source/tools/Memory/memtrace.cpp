@@ -60,18 +60,18 @@ typedef CACHE_DIRECT_MAPPED(max_sets, allocation) CACHE;
 } // namespace UL3
 static UL3::CACHE ul3("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::associativity);
 
-static VOID Fini(int code, VOID* v)
-{
-
-    std::cout << "num mem accesses: "<<num_maccess <<std::endl;
-    std::cout << "Fini finished"<<std::endl;
-}
-
 static inline VOID dump_tbuf() { //TODO add threaID to arg
     for (uint64_t i = 0; i < tb_i; i++) {
         fprintf(trace, "%p\n", (void*)(t_buf[i]));
     }
     tb_i = 0;
+}
+
+static VOID Fini(int code, VOID* v) //TODO this should change to threadfini?
+{
+    dump_tbuf();
+    std::cout << "num mem accesses: "<<num_maccess <<std::endl;
+    std::cout << "Fini finished"<<std::endl;
 }
 
 static inline VOID recordAccess(ADDRINT addr) { //TODO add threaID to arg
@@ -97,8 +97,11 @@ static inline VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE 
 static VOID InsRef(ADDRINT addr) //TODO add threaID to arg
 {
     ins_count++;
-    if(ins_count % 10000==0){
-    std::cout<<"ins_count: "<<ins_count/1000<<" K"<<std::endl;
+    if(ins_count % 100000==0){
+        std::cout<<"ins_count: "<<ins_count/1000<<" K"<<std::endl;
+        //Mark timestamp in the trace file
+        dump_tbuf();
+        fprintf(trace, "CYCLE_COUNT %d\n", ins_count);
     }
 
     const UINT32 size                        = 1; // assuming access does not cross cache lines

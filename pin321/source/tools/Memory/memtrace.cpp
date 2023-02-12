@@ -67,7 +67,7 @@ static VOID Fini(int code, VOID* v)
     std::cout << "Fini finished"<<std::endl;
 }
 
-static inline VOID dump_tubf() { //TODO add threaID to arg
+static inline VOID dump_tbuf() { //TODO add threaID to arg
     for (uint64_t i = 0; i < tb_i; i++) {
         fprintf(trace, "%p\n", (void*)(t_buf[i]));
     }

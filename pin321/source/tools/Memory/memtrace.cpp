@@ -117,14 +117,14 @@ static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 
     //// first level I-cache (Got rid of l1/l2 for data cache, keeping IL1
     const BOOL il1Hit = il1.AccessSingleLine(addr, accessType);
-    if (!il1Hit) Ul3Access(addr, size, accessType);
+    if (!il1Hit) Ul3Access(addr, size, accessType, tid);
 
 }
 
 static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid) //TODO add threaID to arg
 {
     //TODO figure out how to handle memref_multi
-    Ul3Access(addr, size, accessType);
+    Ul3Access(addr, size, accessType, tid);
     return;
 
     //memref_multi_count++;
@@ -150,7 +150,7 @@ static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE acces
 
 static VOID MemRefSingle(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid) //TODO add threaID to arg
 {
-    Ul3Access(addr, size, accessType);
+    Ul3Access(addr, size, accessType, tid);
     return;
     //DBG counter
     //memref_single_count++;

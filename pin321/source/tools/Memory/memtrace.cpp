@@ -60,7 +60,7 @@ typedef CACHE_DIRECT_MAPPED(max_sets, allocation) CACHE;
 } // namespace UL3
 static UL3::CACHE ul3("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::associativity);
 
-static inline VOID dump_tbuf() { //TODO add threaID to arg  
+static inline VOID dump_tbuf(THREADID tid) { //TODO add threaID to arg  
     //added this as an optimization, but doesn't seem to save runtime much :(
     for (uint64_t i = 0; i < tb_i; i++) {
         fprintf(trace, "%p\n", (void*)(t_buf[i]));
@@ -75,21 +75,21 @@ static VOID Fini(int code, VOID* v) //TODO this should change to threadfini?
     std::cout << "Fini finished"<<std::endl;
 }
 
-static inline VOID recordAccess(ADDRINT addr) { //TODO add threaID to arg
+static inline VOID recordAccess(ADDRINT addr, THREADID tid) { //TODO add threaID to arg
     num_maccess++;
     t_buf[tb_i] = addr;
     tb_i++;
     if (tb_i == TBUF_SIZE) {
-        dump_tbuf();
+        dump_tbuf(tid);
     }
     
 }
 
-static inline VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType) ////TODO add threaID to arg
+static inline VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid) ////TODO add threaID to arg
 {
     const BOOL ul3hit = ul3.Access(addr, size, accessType);
     if(!ul3hit){
-        recordAccess(addr);
+        recordAccess(addr, tid);
     }
 }
 
@@ -99,7 +99,7 @@ static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 {
     ins_count++;
     if(ins_count % 100000==0){
-        std::cout<<"thread_"<<tid << "ins_count: " << ins_count / 1000 << " K" << std::endl;
+        std::cout<<"thread_"<<tid << " ins_count: " << ins_count / 1000 << " K" << std::endl;
         //Mark timestamp in the trace file
         dump_tbuf();
         fprintf(trace, "CYCLE_COUNT %ld\n", ins_count);
@@ -114,7 +114,7 @@ static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 
 }
 
-static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType) //TODO add threaID to arg
+static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid) //TODO add threaID to arg
 {
     //TODO figure out how to handle memref_multi
     Ul3Access(addr, size, accessType);
@@ -141,7 +141,7 @@ static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE acces
     
 }
 
-static VOID MemRefSingle(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType) //TODO add threaID to arg
+static VOID MemRefSingle(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid) //TODO add threaID to arg
 {
     Ul3Access(addr, size, accessType);
     return;
@@ -189,7 +189,7 @@ static VOID Instruction(INS ins, VOID* v)
 
         // only predicated-on memory instructions access D-cache
         INS_InsertPredicatedCall(ins, IPOINT_BEFORE, countFun, IARG_MEMORYREAD_EA, IARG_MEMORYREAD_SIZE, IARG_UINT32,
-                                 CACHE_BASE::ACCESS_TYPE_LOAD, IARG_END);
+                                 CACHE_BASE::ACCESS_TYPE_LOAD, IARG_THREAD_ID, IARG_END);
     }
 
     if (writeOperandCount > 0)
@@ -198,7 +198,7 @@ static VOID Instruction(INS ins, VOID* v)
 
         // only predicated-on memory instructions access D-cache
         INS_InsertPredicatedCall(ins, IPOINT_BEFORE, countFun, IARG_MEMORYWRITE_EA, IARG_MEMORYWRITE_SIZE, IARG_UINT32,
-                                 CACHE_BASE::ACCESS_TYPE_STORE, IARG_END);
+                                 CACHE_BASE::ACCESS_TYPE_STORE, IARG_THREAD_ID, IARG_END);
     }
 }
 

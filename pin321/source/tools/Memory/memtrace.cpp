@@ -21,15 +21,17 @@ typedef UINT32 CACHE_STATS; // type of cache hit/miss counters
 FILE * trace[MAX_THREADS];
 //KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "memtrace.out", "specify output file name");
 
-uint64_t ins_count=0;
+uint64_t ins_count[MAX_THREADS] = {};
 uint64_t memref_single_count=0;
 uint64_t memref_multi_count=0;
-uint64_t num_maccess=0;
+uint64_t num_maccess[MAX_THREADS] = {};
 
 //intermediate data structure to batch write to file
 #define TBUF_SIZE 1024
-uint64_t t_buf[TBUF_SIZE];
-uint64_t tb_i = 0;
+//uint64_t t_buf[TBUF_SIZE];
+//uint64_t tb_i = 0;
+uint64_t t_buf[MAX_THREADS][TBUF_SIZE];
+uint64_t tb_i[MAX_THREADS] = 0;
 
 uint64_t numThreads = 0;
 
@@ -66,10 +68,11 @@ static UL3::CACHE ul3("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::as
 
 static inline VOID dump_tbuf(THREADID tid) { //TODO add threaID to arg  
     //added this as an optimization, but doesn't seem to save runtime much :(
-    for (uint64_t i = 0; i < tb_i; i++) {
-        fprintf(trace[tid], "%p\n", (void*)(t_buf[i]));
+    uint64_t tmp_tbi=tb_i[tid]
+    for (uint64_t i = 0; i < tmp_tbi; i++) {
+        fprintf(trace[tid], "%p\n", (void*)(t_buf[tid][i]));
     }
-    tb_i = 0;
+    tb_i[tid] = 0;
 }
 
 static VOID Fini(int code, VOID* v) //TODO this should change to threadfini?
@@ -80,15 +83,15 @@ static VOID Fini(int code, VOID* v) //TODO this should change to threadfini?
 }
 VOID ThreadFini(THREADID tid, const CONTEXT* ctxt, INT32 code, VOID* v) {
     dump_tbuf(tid);
-    std::cout <<"thread_"<<tid << " num mem accesses: " << num_maccess << std::endl;
+    std::cout <<"thread_"<<tid << " num mem accesses: " << num_maccess[tid] << std::endl;
     std::cout << "thread_" << tid << " Fini finished" << std::endl;
 }
 
 static inline VOID recordAccess(ADDRINT addr, THREADID tid) { //TODO add threaID to arg
-    num_maccess++;
-    t_buf[tb_i] = addr;
-    tb_i++;
-    if (tb_i == TBUF_SIZE) {
+    num_maccess[tid]++;
+    t_buf[tid][tb_i[tid]] = addr;
+    tb_i[tid]++;
+    if (tb_i[tid] == TBUF_SIZE) {
         dump_tbuf(tid);
     }
     
@@ -106,12 +109,12 @@ static inline VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE 
 
 static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 {
-    ins_count++;
-    if(ins_count % 100000==0){
-        std::cout<<"thread_"<<tid << " ins_count: " << ins_count / 1000 << " K" << std::endl;
+    ins_count[tid]++;
+    if(ins_count[tid] % 100000==0){
+        std::cout<<"thread_"<<tid << " ins_count: " << ins_count[tid] / 1000 << " K" << std::endl;
         //Mark timestamp in the trace file
         dump_tbuf(tid);
-        fprintf(trace[tid], "CYCLE_COUNT %ld\n", ins_count);
+        fprintf(trace[tid], "CYCLE_COUNT %ld\n", ins_count[tid]);
     }
 
     const UINT32 size                        = 1; // assuming access does not cross cache lines
@@ -144,10 +147,7 @@ static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE acces
     //}
     //return;
     ////above is test code. TODO REMOVE
-  
 
-
-    
 }
 
 static VOID MemRefSingle(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid) //TODO add threaID to arg

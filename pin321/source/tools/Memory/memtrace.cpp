@@ -24,6 +24,11 @@ uint64_t memref_single_count=0;
 uint64_t memref_multi_count=0;
 uint64_t num_maccess=0;
 
+//intermediate data structure to batch write to file
+#define TBUF_SIZE 1024
+uint64_t t_buf[TBUF_SIZE];
+uint64_t tb_i = 0;
+
 
 namespace IL1
 {
@@ -62,13 +67,24 @@ static VOID Fini(int code, VOID* v)
     std::cout << "Fini finished"<<std::endl;
 }
 
-static VOID recordAccess(ADDRINT addr) {
+static inline VOID dump_tubf() { //TODO add threaID to arg
+    for (uint64_t i = 0; i < tb_i; i++) {
+        fprintf(trace, "%p\n", (void*)(t_buf[i]));
+    }
+    tb_i = 0;
+}
+
+static inline VOID recordAccess(ADDRINT addr) { //TODO add threaID to arg
     num_maccess++;
-    fprintf(trace, "%p\n", (void*)addr);
+    t_buf[tb_i] = addr;
+    tb_i++;
+    if (tb_i == TBUF_SIZE) {
+        dump_tbuf();
+    }
     
 }
 
-static VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType)
+static inline VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType) ////TODO add threaID to arg
 {
     const BOOL ul3hit = ul3.Access(addr, size, accessType);
     if(!ul3hit){
@@ -78,7 +94,7 @@ static VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessT
 
 
 
-static VOID InsRef(ADDRINT addr)
+static VOID InsRef(ADDRINT addr) //TODO add threaID to arg
 {
     ins_count++;
     if(ins_count % 10000==0){
@@ -94,7 +110,7 @@ static VOID InsRef(ADDRINT addr)
 
 }
 
-static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType)
+static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType) //TODO add threaID to arg
 {
     //TODO figure out how to handle memref_multi
     Ul3Access(addr, size, accessType);
@@ -121,7 +137,7 @@ static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE acces
     
 }
 
-static VOID MemRefSingle(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType)
+static VOID MemRefSingle(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType) //TODO add threaID to arg
 {
     Ul3Access(addr, size, accessType);
     return;

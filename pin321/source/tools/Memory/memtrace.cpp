@@ -17,7 +17,7 @@ typedef UINT32 CACHE_STATS; // type of cache hit/miss counters
 #include "pin_cache.H"
 
 FILE * trace;
-KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "l3trace.out", "specify output file name");
+KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "memtrace.out", "specify output file name");
 
 uint64_t ins_count=0;
 uint64_t memref_single_count=0;
@@ -60,7 +60,8 @@ typedef CACHE_DIRECT_MAPPED(max_sets, allocation) CACHE;
 } // namespace UL3
 static UL3::CACHE ul3("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::associativity);
 
-static inline VOID dump_tbuf() { //TODO add threaID to arg
+static inline VOID dump_tbuf() { //TODO add threaID to arg  
+    //added this as an optimization, but doesn't seem to save runtime much :(
     for (uint64_t i = 0; i < tb_i; i++) {
         fprintf(trace, "%p\n", (void*)(t_buf[i]));
     }
@@ -94,11 +95,11 @@ static inline VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE 
 
 
 
-static VOID InsRef(ADDRINT addr) //TODO add threaID to arg
+static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 {
     ins_count++;
     if(ins_count % 100000==0){
-        std::cout<<"ins_count: "<<ins_count/1000<<" K"<<std::endl;
+        std::cout<<"thread_"<<tid << "ins_count: " << ins_count / 1000 << " K" << std::endl;
         //Mark timestamp in the trace file
         dump_tbuf();
         fprintf(trace, "CYCLE_COUNT %ld\n", ins_count);
@@ -157,7 +158,7 @@ static VOID Instruction(INS ins, VOID* v)
 {
 
     // all instruction fetches access I-cache
-    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)InsRef, IARG_INST_PTR, IARG_END);
+    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)InsRef, IARG_INST_PTR, IARG_THREAD_ID, IARG_END);
 
     if (!INS_IsStandardMemop(ins)) return;
     if (INS_MemoryOperandCount(ins) == 0) return;

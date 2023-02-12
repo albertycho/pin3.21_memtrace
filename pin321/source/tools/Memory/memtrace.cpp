@@ -29,6 +29,8 @@ uint64_t num_maccess=0;
 uint64_t t_buf[TBUF_SIZE];
 uint64_t tb_i = 0;
 
+uint64_t numThreads = 0;
+
 
 namespace IL1
 {
@@ -70,9 +72,14 @@ static inline VOID dump_tbuf(THREADID tid) { //TODO add threaID to arg
 
 static VOID Fini(int code, VOID* v) //TODO this should change to threadfini?
 {
-    dump_tbuf();
-    std::cout << "num mem accesses: "<<num_maccess <<std::endl;
+    //dump_tbuf();
+    //std::cout << "num mem accesses: "<<num_maccess <<std::endl;
     std::cout << "Fini finished"<<std::endl;
+}
+VOID ThreadFini(THREADID tid, const CONTEXT* ctxt, INT32 code, VOID* v) {
+    dump_tbuf(tid);
+    std::cout <<"thread_"<<tid << " num mem accesses: " << num_maccess << std::endl;
+    std::cout << "thread_" << tid << " Fini finished" << std::endl;
 }
 
 static inline VOID recordAccess(ADDRINT addr, THREADID tid) { //TODO add threaID to arg
@@ -101,7 +108,7 @@ static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
     if(ins_count % 100000==0){
         std::cout<<"thread_"<<tid << " ins_count: " << ins_count / 1000 << " K" << std::endl;
         //Mark timestamp in the trace file
-        dump_tbuf();
+        dump_tbuf(tid);
         fprintf(trace, "CYCLE_COUNT %ld\n", ins_count);
     }
 
@@ -202,13 +209,21 @@ static VOID Instruction(INS ins, VOID* v)
     }
 }
 
+VOID ThreadStart(THREADID threadid, CONTEXT* ctxt, INT32 flags, VOID* v) { 
+    std::cout << "thread_" << threadid << " start" << std::endl;
+    numThreads++; 
+}
+
 extern int main(int argc, char* argv[])
 {
     PIN_Init(argc, argv);
 
     trace = fopen(KnobOutputFile.Value().c_str(), "w");
     INS_AddInstrumentFunction(Instruction, 0);
-    PIN_AddFiniFunction(Fini, 0);
+    //PIN_AddFiniFunction(Fini, 0);
+    
+    PIN_AddThreadStartFunction(ThreadStart, 0);
+    PIN_AddThreadFiniFunction(ThreadFini, 0);
 
     std::cout<<"before calling prog"<<std::endl;
     // Never returns

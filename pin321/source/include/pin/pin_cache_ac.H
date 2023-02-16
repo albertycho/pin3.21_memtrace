@@ -11,10 +11,12 @@
 #define PIN_CACHE_H
 
 #include <string>
-#include <mutex>
-#include <thread>
+//#include <atomic>
+//#include <mutex>
+//#include <thread>
 
 #include "pin_util.H"
+#include "atomic.hpp"
 
 /*!
  *  @brief Checks if n is a power of 2.
@@ -115,7 +117,9 @@ template< UINT32 MAX_ASSOCIATIVITY = 4 > class ROUND_ROBIN
     CACHE_TAG _tags[MAX_ASSOCIATIVITY];
     UINT32 _tagsLastIndex;
     UINT32 _nextReplaceIndex;
-    std::mutex set_mtx;
+    //std::mutex set_mtx;
+    //std::atomic_flag lock_repl = ATOMIC_FLAG_INIT;
+    PIN_MUTEX setMtx;
 
   public:
     ROUND_ROBIN(UINT32 associativity = MAX_ASSOCIATIVITY) : _tagsLastIndex(associativity - 1)
@@ -127,6 +131,7 @@ template< UINT32 MAX_ASSOCIATIVITY = 4 > class ROUND_ROBIN
         {
             _tags[index] = CACHE_TAG(0);
         }
+        PIN_MutexInit(&setMtx);
     }
 
     VOID SetAssociativity(UINT32 associativity)
@@ -155,14 +160,16 @@ template< UINT32 MAX_ASSOCIATIVITY = 4 > class ROUND_ROBIN
 
     VOID Replace(CACHE_TAG tag)
     {
-        set_mtx.lock();
+        //set_mtx.lock();
+        PIN_MutexLock(&setMtx);
         // g++ -O3 too dumb to do CSE on following lines?!
         const UINT32 index = _nextReplaceIndex;
 
         _tags[index] = tag;
         // condition typically faster than modulo
         _nextReplaceIndex = (index == 0 ? _tagsLastIndex : index - 1);
-        set_mtx.unlock();
+        //set_mtx.unlock();
+        PIN_MutexUnlock(&setMtx);
     }
     VOID Flush()
     {

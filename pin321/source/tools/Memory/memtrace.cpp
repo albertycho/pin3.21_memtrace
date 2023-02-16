@@ -58,7 +58,7 @@ namespace UL2
 // 2nd level unified cache: 2 MB, 64 B lines, direct mapped
 const UINT32 cacheSize                         = 2 * MEGA;
 const UINT32 lineSize                          = 64;
-const UINT32 associativity                     = 1;
+const UINT32 associativity                     = 8;
 const CACHE_ALLOC::STORE_ALLOCATION allocation = CACHE_ALLOC::STORE_ALLOCATE;
 
 const UINT32 max_sets = cacheSize / (lineSize * associativity);
@@ -70,14 +70,15 @@ static UL2::CACHE *ul2[MAX_THREADS];
 namespace UL3
 {
 // 3rd level unified cache: 16 MB, 64 B lines, direct mapped
-const UINT32 cacheSize                         = 4 * MEGA;
+const UINT32 cacheSize                         = 32 * MEGA;
 const UINT32 lineSize                          = 64;
-const UINT32 associativity                     = 1;
+const UINT32 associativity                     = 8;
 const CACHE_ALLOC::STORE_ALLOCATION allocation = CACHE_ALLOC::STORE_ALLOCATE;
 
 const UINT32 max_sets = cacheSize / (lineSize * associativity);
 
-typedef CACHE_DIRECT_MAPPED(max_sets, allocation) CACHE;
+//typedef CACHE_DIRECT_MAPPED(max_sets, allocation) CACHE;
+typedef CACHE_ROUND_ROBIN(max_sets, allocation) CACHE;
 } // namespace UL3
 static UL3::CACHE ul3("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::associativity);
 //static UL3::CACHE *ul3[MAX_THREADS];

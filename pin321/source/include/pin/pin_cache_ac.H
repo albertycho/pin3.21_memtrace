@@ -111,7 +111,7 @@ class DIRECT_MAPPED
 /*!
  *  @brief Cache set with round robin replacement
  */
-template< UINT32 MAX_ASSOCIATIVITY = 4 > class ROUND_ROBIN
+template< UINT32 MAX_ASSOCIATIVITY = 8 > class ROUND_ROBIN
 {
   private:
     CACHE_TAG _tags[MAX_ASSOCIATIVITY];

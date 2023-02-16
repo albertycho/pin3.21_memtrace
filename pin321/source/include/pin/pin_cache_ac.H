@@ -11,6 +11,8 @@
 #define PIN_CACHE_H
 
 #include <string>
+#include <mutex>
+#include <thread>
 
 #include "pin_util.H"
 
@@ -113,6 +115,7 @@ template< UINT32 MAX_ASSOCIATIVITY = 4 > class ROUND_ROBIN
     CACHE_TAG _tags[MAX_ASSOCIATIVITY];
     UINT32 _tagsLastIndex;
     UINT32 _nextReplaceIndex;
+    std::mutex set_mtx;
 
   public:
     ROUND_ROBIN(UINT32 associativity = MAX_ASSOCIATIVITY) : _tagsLastIndex(associativity - 1)
@@ -152,12 +155,14 @@ template< UINT32 MAX_ASSOCIATIVITY = 4 > class ROUND_ROBIN
 
     VOID Replace(CACHE_TAG tag)
     {
+        set_mtx.lock();
         // g++ -O3 too dumb to do CSE on following lines?!
         const UINT32 index = _nextReplaceIndex;
 
         _tags[index] = tag;
         // condition typically faster than modulo
         _nextReplaceIndex = (index == 0 ? _tagsLastIndex : index - 1);
+        set_mtx.unlock();
     }
     VOID Flush()
     {

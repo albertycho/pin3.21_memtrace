@@ -15,7 +15,7 @@
 
 typedef UINT32 CACHE_STATS; // type of cache hit/miss counters
 
-#include "pin_cache.H"
+#include "pin_cache_ac.H"
 
 #define MAX_THREADS 64
 FILE * trace[MAX_THREADS];
@@ -53,7 +53,19 @@ typedef CACHE_ROUND_ROBIN(max_sets, max_associativity, allocation) CACHE;
 //static IL1::CACHE *il1=new IL1::CACHE("L1 Instruction Cache", IL1::cacheSize, IL1::lineSize, IL1::associativity);
 static IL1::CACHE *il1[MAX_THREADS];
 
+namespace UL2
+{
+// 2nd level unified cache: 2 MB, 64 B lines, direct mapped
+const UINT32 cacheSize                         = 2 * MEGA;
+const UINT32 lineSize                          = 64;
+const UINT32 associativity                     = 1;
+const CACHE_ALLOC::STORE_ALLOCATION allocation = CACHE_ALLOC::STORE_ALLOCATE;
 
+const UINT32 max_sets = cacheSize / (lineSize * associativity);
+
+typedef CACHE_DIRECT_MAPPED(max_sets, allocation) CACHE;
+} // namespace UL2
+static UL3::CACHE *ul2[MAX_THREADS];
 
 namespace UL3
 {
@@ -111,13 +123,24 @@ static inline VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE 
     }
 }
 
+static VOID Ul2Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid)
+{
+    // second level unified cache
+    const BOOL ul2Hit = ul2.Access(addr, size, accessType);
+
+    // third level unified cache
+    if(!ul2Hit) {
+        Ul3Access(addr, size, accessType, tid);
+    }
+}
+
 
 
 static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 {
     ins_count[tid]++;
-    if(ins_count[tid] % 100000==0){
-        std::cout<<"thread_"<<tid << " ins_count: " << ins_count[tid] / 1000 << " K" << std::endl;
+    if(ins_count[tid] % 10000000==0){
+        std::cout<<"thread_"<<tid << " ins_count: " << ins_count[tid] / 1000000 << " M" << std::endl;
         //Mark timestamp in the trace file
         dump_tbuf(tid);
         fprintf(trace[tid], "CYCLE_COUNT %ld\n", ins_count[tid]);
@@ -129,14 +152,16 @@ static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
     //// first level I-cache (Got rid of l1/l2 for data cache, keeping IL1
     //const BOOL il1Hit = il1.AccessSingleLine(addr, accessType);
     const BOOL il1Hit = il1[tid]->AccessSingleLine(addr, accessType);
-    if (!il1Hit) Ul3Access(addr, size, accessType, tid);
+    //if (!il1Hit) Ul3Access(addr, size, accessType, tid);
+    if (!il1Hit) Ul2Access(addr, size, accessType, tid);
 
 }
 
 static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid) //TODO add threaID to arg
 {
     //TODO figure out how to handle memref_multi
-    Ul3Access(addr, size, accessType, tid);
+    //Ul3Access(addr, size, accessType, tid);
+    Ul2Access(addr, size, accessType, tid);
     return;
 
     //memref_multi_count++;
@@ -159,7 +184,8 @@ static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE acces
 
 static VOID MemRefSingle(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid) //TODO add threaID to arg
 {
-    Ul3Access(addr, size, accessType, tid);
+    //Ul3Access(addr, size, accessType, tid);
+    Ul2Access(addr, size, accessType, tid);
     return;
     //DBG counter
     //memref_single_count++;
@@ -227,6 +253,7 @@ VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) {
     trace[tid] = fopen(tfname.str().c_str(), "w");
 
     il1[tid] = new IL1::CACHE("L1 Instruction Cache", IL1::cacheSize, IL1::lineSize, IL1::associativity);
+    ul2[tid] = new UL2::CACHE("L2 Unified Cache", UL2::cacheSize, UL2::lineSize, UL2::associativity);
     ul3[tid] = new UL3::CACHE("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::associativity);
 }
 

@@ -65,12 +65,12 @@ const UINT32 max_sets = cacheSize / (lineSize * associativity);
 
 typedef CACHE_DIRECT_MAPPED(max_sets, allocation) CACHE;
 } // namespace UL2
-static UL3::CACHE *ul2[MAX_THREADS];
+static UL2::CACHE *ul2[MAX_THREADS];
 
 namespace UL3
 {
 // 3rd level unified cache: 16 MB, 64 B lines, direct mapped
-const UINT32 cacheSize                         = 16 * MEGA;
+const UINT32 cacheSize                         = 4 * MEGA;
 const UINT32 lineSize                          = 64;
 const UINT32 associativity                     = 1;
 const CACHE_ALLOC::STORE_ALLOCATION allocation = CACHE_ALLOC::STORE_ALLOCATE;
@@ -126,7 +126,7 @@ static inline VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE 
 static VOID Ul2Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid)
 {
     // second level unified cache
-    const BOOL ul2Hit = ul2.Access(addr, size, accessType);
+    const BOOL ul2Hit = ul2[tid]->Access(addr, size, accessType);
 
     // third level unified cache
     if(!ul2Hit) {

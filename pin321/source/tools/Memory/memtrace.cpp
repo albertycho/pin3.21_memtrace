@@ -63,7 +63,8 @@ const CACHE_ALLOC::STORE_ALLOCATION allocation = CACHE_ALLOC::STORE_ALLOCATE;
 
 const UINT32 max_sets = cacheSize / (lineSize * associativity);
 
-typedef CACHE_DIRECT_MAPPED(max_sets, allocation) CACHE;
+//typedef CACHE_DIRECT_MAPPED(max_sets, allocation) CACHE;
+typedef CACHE_ROUND_ROBIN(max_sets, associativity, allocation) CACHE;
 } // namespace UL2
 static UL2::CACHE *ul2[MAX_THREADS];
 

@@ -79,8 +79,8 @@ const UINT32 max_sets = cacheSize / (lineSize * associativity);
 
 typedef CACHE_DIRECT_MAPPED(max_sets, allocation) CACHE;
 } // namespace UL3
-//static UL3::CACHE ul3("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::associativity);
-static UL3::CACHE *ul3[MAX_THREADS];
+static UL3::CACHE ul3("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::associativity);
+//static UL3::CACHE *ul3[MAX_THREADS];
 
 
 
@@ -117,7 +117,8 @@ static inline VOID recordAccess(ADDRINT addr, THREADID tid) { //TODO add threaID
 
 static inline VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid) ////TODO add threaID to arg
 {
-    const BOOL ul3hit = ul3[tid]->Access(addr, size, accessType);
+    //const BOOL ul3hit = ul3[tid]->Access(addr, size, accessType);
+    const BOOL ul3hit = ul3.Access(addr, size, accessType);
     if(!ul3hit){
         recordAccess(addr, tid);
     }
@@ -254,7 +255,7 @@ VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) {
 
     il1[tid] = new IL1::CACHE("L1 Instruction Cache", IL1::cacheSize, IL1::lineSize, IL1::associativity);
     ul2[tid] = new UL2::CACHE("L2 Unified Cache", UL2::cacheSize, UL2::lineSize, UL2::associativity);
-    ul3[tid] = new UL3::CACHE("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::associativity);
+    //ul3[tid] = new UL3::CACHE("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::associativity);
 }
 
 extern int main(int argc, char* argv[])

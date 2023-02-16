@@ -52,7 +52,9 @@ iax.set_xlabel("Number of threads sharing the accessed page")
 iax.set_ylabel("Distribution of accesses")
 iax.grid(color='gray', linestyle='--', linewidth=0.2, markevery=int, zorder=1, alpha=0.4)
 
-iax.text(0,0.7,"Total accesses: "+str( '%.2f'% (float(allacc)/1000000.0))+"Million")
+#iax.text(0,0.7,"Total accesses: "+str( '%.2f'% (float(allacc)/1000000.0))+"Million")
+print("total accesses: "+str( '%.2f'% (float(allacc)/1000000.0))+"Million")
+
 
 ifig.figsize=(20, 10)
 ifig.savefig('access_hist.png', bbox_inches='tight')
@@ -69,7 +71,7 @@ iax.set_xlabel("Number of threads sharing the page")
 iax.set_ylabel("Distribution of Pages")
 iax.grid(color='gray', linestyle='--', linewidth=0.2, markevery=int, zorder=1, alpha=0.4)
 
-#iax.text(0,0.7,"Total accesses: "+str( '%.2f'% (float(allacc)/1000000.0))+"Million")
+iax.text(0,0.7,"Total accesses: "+str( '%.2f'% (float(allacc)/1000000.0))+"Million")
 
 ifig.figsize=(20, 10)
 ifig.savefig('pages_hist.png', bbox_inches='tight')

@@ -66,7 +66,8 @@ for mtname in mtnames:
     
     pa_count={}
     while line1:
-        if 'CYCLE_COUNT' in line1:
+        #if 'CYCLE_COUNT' in line1:
+        if 'INST_COUNT' in line1:
             line1=f1.readline();
             continue
         else:

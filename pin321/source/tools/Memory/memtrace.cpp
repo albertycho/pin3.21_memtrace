@@ -142,11 +142,11 @@ static VOID Ul2Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessT
 static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 {
     ins_count[tid]++;
-    if(ins_count[tid] % 10000000==0){
+    if(ins_count[tid] % 100000000==0){
         std::cout<<"thread_"<<tid << " ins_count: " << ins_count[tid] / 1000000 << " M" << std::endl;
         //Mark timestamp in the trace file
         dump_tbuf(tid);
-        fprintf(trace[tid], "CYCLE_COUNT %ld\n", ins_count[tid]);
+        fprintf(trace[tid], "INST_COUNT %ld\n", ins_count[tid]);
     }
 
     const UINT32 size                        = 1; // assuming access does not cross cache lines

@@ -19,6 +19,7 @@ typedef UINT32 CACHE_STATS; // type of cache hit/miss counters
 
 #define MAX_THREADS 64
 FILE * trace[MAX_THREADS];
+FILE * ins_trace[MAX_THREADS];
 //KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "memtrace.out", "specify output file name");
 
 uint64_t ins_count[MAX_THREADS] = {};
@@ -105,6 +106,8 @@ VOID ThreadFini(THREADID tid, const CONTEXT* ctxt, INT32 code, VOID* v) {
     dump_tbuf(tid);
     std::cout <<"thread_"<<tid << " num mem accesses: " << num_maccess[tid] << std::endl;
     std::cout << "thread_" << tid << " Fini finished" << std::endl;
+    fclose(trace[tid]);
+    fclose(ins_trace[tid]);
 }
 
 static inline VOID recordAccess(ADDRINT addr, THREADID tid) { //TODO add threaID to arg
@@ -117,23 +120,26 @@ static inline VOID recordAccess(ADDRINT addr, THREADID tid) { //TODO add threaID
     
 }
 
-static inline VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid) ////TODO add threaID to arg
+static inline VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid, bool isIns=false) ////TODO add threaID to arg
 {
     //const BOOL ul3hit = ul3[tid]->Access(addr, size, accessType);
     const BOOL ul3hit = ul3.Access(addr, size, accessType);
     if(!ul3hit){
         recordAccess(addr, tid);
+        if(isIns){
+            fprintf(ins_trace[tid], "%p\n", (void*)(addr));
+        }
     }
 }
 
-static VOID Ul2Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid)
+static VOID Ul2Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid, bool isIns=false)
 {
     // second level unified cache
     const BOOL ul2Hit = ul2[tid]->Access(addr, size, accessType);
 
     // third level unified cache
     if(!ul2Hit) {
-        Ul3Access(addr, size, accessType, tid);
+        Ul3Access(addr, size, accessType, tid, isIns);
     }
 }
 
@@ -142,11 +148,14 @@ static VOID Ul2Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessT
 static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 {
     ins_count[tid]++;
-    if(ins_count[tid] % 100000000==0){
-        std::cout<<"thread_"<<tid << " ins_count: " << ins_count[tid] / 1000000 << " M" << std::endl;
+    if(ins_count[tid] % 10000000==0){
+        if(ins_count[tid] % 1000000000==0){
+            std::cout<<"thread_"<<tid << " ins_count: " << ins_count[tid] / 1000000000 << " B" << std::endl;
+        }
         //Mark timestamp in the trace file
         dump_tbuf(tid);
         fprintf(trace[tid], "INST_COUNT %ld\n", ins_count[tid]);
+        fprintf(ins_trace[tid], "INST_COUNT %ld\n", ins_count[tid]);
     }
 
     const UINT32 size                        = 1; // assuming access does not cross cache lines
@@ -156,7 +165,7 @@ static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
     //const BOOL il1Hit = il1.AccessSingleLine(addr, accessType);
     const BOOL il1Hit = il1[tid]->AccessSingleLine(addr, accessType);
     //if (!il1Hit) Ul3Access(addr, size, accessType, tid);
-    if (!il1Hit) Ul2Access(addr, size, accessType, tid);
+    if (!il1Hit) Ul2Access(addr, size, accessType, tid, true);
 
 }
 
@@ -254,6 +263,11 @@ VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) {
     std::ostringstream tfname;
     tfname << "memtrace_t" << tid << ".out";
     trace[tid] = fopen(tfname.str().c_str(), "w");
+
+    std::ostringstream ins_tfname;
+    ins_tfname << "ins_memtrace_t" << tid << ".out";
+    ins_trace[tid] = fopen(ins_tfname.str().c_str(), "w");
+
 
     il1[tid] = new IL1::CACHE("L1 Instruction Cache", IL1::cacheSize, IL1::lineSize, IL1::associativity);
     ul2[tid] = new UL2::CACHE("L2 Unified Cache", UL2::cacheSize, UL2::lineSize, UL2::associativity);

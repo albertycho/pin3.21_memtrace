@@ -21,7 +21,10 @@ typedef UINT32 CACHE_STATS; // type of cache hit/miss counters
 FILE * trace[MAX_THREADS];
 FILE * ins_trace[MAX_THREADS];
 //KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "memtrace.out", "specify output file name");
+KNOB< BOOL > KnobStartFF(KNOB_MODE_WRITEONCE, "pintool", "startFF", "0", "no trace until ROI start indicated");
 
+
+BOOL     inROI[MAX_THREADS];
 uint64_t ins_count[MAX_THREADS] = {};
 uint64_t memref_single_count=0;
 uint64_t memref_multi_count=0;
@@ -147,6 +150,11 @@ static VOID Ul2Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessT
 
 static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 {
+    if(!inROI[tid]){
+        return;
+    }
+    
+
     ins_count[tid]++;
     if(ins_count[tid] % 10000000==0){
         if(ins_count[tid] % 1000000000==0){
@@ -171,6 +179,9 @@ static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 
 static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid) //TODO add threaID to arg
 {
+    if(!inROI[tid]){
+        return;
+    } 
     //TODO figure out how to handle memref_multi
     //Ul3Access(addr, size, accessType, tid);
     Ul2Access(addr, size, accessType, tid);
@@ -196,6 +207,10 @@ static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE acces
 
 static VOID MemRefSingle(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid) //TODO add threaID to arg
 {
+    if(!inROI[tid]){
+        return;
+    }
+    
     //Ul3Access(addr, size, accessType, tid);
     Ul2Access(addr, size, accessType, tid);
     return;
@@ -208,11 +223,33 @@ static VOID MemRefSingle(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE acce
     
 
 }
+
+static VOID pin_magic_inst(THREADID tid, ADDRINT value, ADDRINT field){
+        switch(field){
+            case 0x0: //ROI START
+                inROI[tid]=true;
+                std::cout<<"ROI START (tid "<<tid<<")"<<std::endl;
+                break;
+            default:
+                break;
+
+        }
+        return;
+}
+
 static VOID Instruction(INS ins, VOID* v)
 {
 
     // all instruction fetches access I-cache
     INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)InsRef, IARG_INST_PTR, IARG_THREAD_ID, IARG_END);
+
+    // MAGIC INSTRUCTIONS
+    // start ROI if started 'FF'
+    if (INS_IsXchg(ins) && INS_OperandReg(ins, 0) == REG_RBX && INS_OperandReg(ins, 1) == REG_RBX) {
+        //std::cout<<"(xchg rbx rbx caught)!"<<std::endl; 
+        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)pin_magic_inst, IARG_THREAD_ID, IARG_REG_VALUE, REG_RBX, IARG_REG_VALUE, REG_RCX, IARG_END);
+        //INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)ROI_start, IARG_THREAD_ID, IARG_END);
+    }
 
     if (!INS_IsStandardMemop(ins)) return;
     if (INS_MemoryOperandCount(ins) == 0) return;
@@ -268,6 +305,13 @@ VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) {
     ins_tfname << "ins_memtrace_t" << tid << ".out";
     ins_trace[tid] = fopen(ins_tfname.str().c_str(), "w");
 
+    if(KnobStartFF){
+        inROI[tid]=false;
+    }
+    else{
+        inROI[tid]=true;
+    }
+    
 
     il1[tid] = new IL1::CACHE("L1 Instruction Cache", IL1::cacheSize, IL1::lineSize, IL1::associativity);
     ul2[tid] = new UL2::CACHE("L2 Unified Cache", UL2::cacheSize, UL2::lineSize, UL2::associativity);

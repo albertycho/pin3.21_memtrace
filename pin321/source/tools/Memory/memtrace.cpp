@@ -35,6 +35,7 @@ uint64_t num_maccess[MAX_THREADS] = {};
 //uint64_t t_buf[TBUF_SIZE];
 //uint64_t tb_i = 0;
 uint64_t t_buf[MAX_THREADS][TBUF_SIZE];
+uint8_t rw_buf[MAX_THREADS][TBUF_SIZE];
 uint64_t tb_i[MAX_THREADS] = {};
 
 uint64_t numThreads = 0;
@@ -94,7 +95,8 @@ static inline VOID dump_tbuf(THREADID tid) { //TODO add threaID to arg
     //added this as an optimization, but doesn't seem to save runtime much :(
     uint64_t tmp_tbi = tb_i[tid];
     for (uint64_t i = 0; i < tmp_tbi; i++) {
-        fprintf(trace[tid], "%p\n", (void*)(t_buf[tid][i]));
+        //fprintf(trace[tid], "%p\n", (void*)(t_buf[tid][i]));
+        fprintf(trace[tid], "%p %d\n", (void*)(t_buf[tid][i]), rw_buf[tid][i]);
     }
     tb_i[tid] = 0;
 }
@@ -104,6 +106,11 @@ static VOID Fini(int code, VOID* v) //TODO this should change to threadfini?
     //dump_tbuf();
     //std::cout << "num mem accesses: "<<num_maccess <<std::endl;
     std::cout << "Fini finished"<<std::endl;
+
+    FILE * doneIndicator = fopen("this_run_is_done.txt", "w");
+	fprintf(doneIndicator, "This run is done!");
+	fclose(doneIndicator);
+
 }
 VOID ThreadFini(THREADID tid, const CONTEXT* ctxt, INT32 code, VOID* v) {
     dump_tbuf(tid);
@@ -113,14 +120,14 @@ VOID ThreadFini(THREADID tid, const CONTEXT* ctxt, INT32 code, VOID* v) {
     fclose(ins_trace[tid]);
 }
 
-static inline VOID recordAccess(ADDRINT addr, THREADID tid) { //TODO add threaID to arg
+static inline VOID recordAccess(ADDRINT addr, THREADID tid, CACHE_BASE::ACCESS_TYPE accessType) { //TODO add threaID to arg
     num_maccess[tid]++;
     t_buf[tid][tb_i[tid]] = addr;
+	rw_buf[tid][tb_i[tid]] = accessType;
     tb_i[tid]++;
     if (tb_i[tid] == TBUF_SIZE) {
         dump_tbuf(tid);
     }
-    
 }
 
 static inline VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid, bool isIns=false) ////TODO add threaID to arg
@@ -128,7 +135,7 @@ static inline VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE 
     //const BOOL ul3hit = ul3[tid]->Access(addr, size, accessType);
     const BOOL ul3hit = ul3.Access(addr, size, accessType);
     if(!ul3hit){
-        recordAccess(addr, tid);
+        recordAccess(addr, tid, accessType);
         if(isIns){
             fprintf(ins_trace[tid], "%p\n", (void*)(addr));
         }

@@ -23,7 +23,7 @@ def save_object(obj,fname):
 
 
 ### TODO make this configurable or automate it?
-n_thr = 4;
+n_thr = 16;
 thr_offset_val=8;
 n_thr_offset = n_thr+thr_offset_val;
 
@@ -56,6 +56,9 @@ print(str(len(mtnames)))
 #mtnames.append("memtrace_t8.out")
 #mtnames.append("memtrace_t9.out")
 
+target_period = 400000000
+at_roi = False
+
 #### STEP 1
 print("running step1");
 for mtname in mtnames:
@@ -67,6 +70,13 @@ for mtname in mtnames:
     pa_count={}
     while line1:
         #if 'CYCLE_COUNT' in line1:
+        if ('INST_COUNT '+str(target_period)) in line1:
+            at_roi = True
+        if ('INST_COUNT '+str(target_period+10000000)) in line1:
+            break;
+        if not at_roi:
+            line1=f1.readline();
+            continue
         if 'INST_COUNT' in line1:
             line1=f1.readline();
             continue

@@ -82,6 +82,8 @@ class CACHE_TAG
     CACHE_TAG(ADDRINT tag = 0) { _tag = tag; }
     bool operator==(const CACHE_TAG& right) const { return _tag == right._tag; }
     operator ADDRINT() const { return _tag; }
+    bool is_dirty;
+    uint64_t ts; //timestamp
 };
 
 /*!
@@ -121,7 +123,9 @@ template< UINT32 MAX_ASSOCIATIVITY = 8 > class ROUND_ROBIN
     //std::atomic_flag lock_repl = ATOMIC_FLAG_INIT;
     PIN_MUTEX setMtx;
 
+
   public:
+    uint64_t curtime=0;
     ROUND_ROBIN(UINT32 associativity = MAX_ASSOCIATIVITY) : _tagsLastIndex(associativity - 1)
     {
         ASSERTX(associativity <= MAX_ASSOCIATIVITY);
@@ -142,7 +146,7 @@ template< UINT32 MAX_ASSOCIATIVITY = 8 > class ROUND_ROBIN
     }
     UINT32 GetAssociativity(UINT32 associativity) { return _tagsLastIndex + 1; }
 
-    UINT32 Find(CACHE_TAG tag)
+    UINT32 Find(CACHE_TAG tag, bool isWrite)
     {
         bool result = true;
 
@@ -150,7 +154,13 @@ template< UINT32 MAX_ASSOCIATIVITY = 8 > class ROUND_ROBIN
         {
             // this is an ugly micro-optimization, but it does cause a
             // tighter assembly loop for ARM that way ...
-            if (_tags[index] == tag) goto end;
+            if (_tags[index] == tag) {
+                if(isWrite){
+                    _tags[index].is_dirty=true;
+                }
+                _tags[index].ts=curtime;
+                goto end;
+            }
         }
         result = false;
 
@@ -158,18 +168,39 @@ template< UINT32 MAX_ASSOCIATIVITY = 8 > class ROUND_ROBIN
         return result;
     }
 
-    VOID Replace(CACHE_TAG tag)
+    //VOID Replace(CACHE_TAG tag, bool isWrite)
+    ADDRINT Replace(CACHE_TAG tag, bool isWrite)
     {
         //set_mtx.lock();
         PIN_MutexLock(&setMtx);
         // g++ -O3 too dumb to do CSE on following lines?!
         const UINT32 index = _nextReplaceIndex;
-
+        ////handling dirty writeback. return tag if evicted line is dirty, else return 0;
+        ADDRINT evicted_tag=0;
+        if(_tags[index].is_dirty){
+            evicted_tag=_tags[index];
+        }
         _tags[index] = tag;
+        _tags[index].ts = curtime;
+        if(isWrite){
+            _tags[index].is_dirty=true;
+        }
+        else{
+            _tags[index].is_dirty=false;
+        }
         // condition typically faster than modulo
         _nextReplaceIndex = (index == 0 ? _tagsLastIndex : index - 1);
+        //_nextReplaceIndex=0;
+        uint64_t oldest=0-1;
+        for(uint32_t i=0; i<_tagsLastIndex+1;i++){
+            if(_tags[i].ts<oldest) {
+                oldest=_tags[i].ts;
+                _nextReplaceIndex=i;
+            }
+        }
         //set_mtx.unlock();
         PIN_MutexUnlock(&setMtx);
+        return evicted_tag;
     }
     VOID Flush()
     {
@@ -261,6 +292,10 @@ class CACHE_BASE
     {
         tag      = addr >> _lineShift;
         setIndex = tag & _setIndexMask;
+    }
+    ADDRINT undoSplit(ADDRINT tag){
+        //return (tag<<_lineShift) | setIndex;
+        return (tag<<_lineShift);
     }
 
     VOID SplitAddress(const ADDRINT addr, CACHE_TAG& tag, UINT32& setIndex, UINT32& lineIndex) const
@@ -358,9 +393,9 @@ template< class SET, UINT32 MAX_SETS, UINT32 STORE_ALLOCATION > class CACHE : pu
 
     // modifiers
     /// Cache access from addr to addr+size-1
-    bool Access(ADDRINT addr, UINT32 size, ACCESS_TYPE accessType);
+    bool Access(ADDRINT addr, UINT32 size, ACCESS_TYPE accessType, ADDRINT &evicted_line);
     /// Cache access at addr that does not span cache lines
-    bool AccessSingleLine(ADDRINT addr, ACCESS_TYPE accessType);
+    bool AccessSingleLine(ADDRINT addr, ACCESS_TYPE accessType, ADDRINT &evicted_line);
     void Flush();
     void ResetStats();
 };
@@ -370,7 +405,7 @@ template< class SET, UINT32 MAX_SETS, UINT32 STORE_ALLOCATION > class CACHE : pu
  */
 
 template< class SET, UINT32 MAX_SETS, UINT32 STORE_ALLOCATION >
-bool CACHE< SET, MAX_SETS, STORE_ALLOCATION >::Access(ADDRINT addr, UINT32 size, ACCESS_TYPE accessType)
+bool CACHE< SET, MAX_SETS, STORE_ALLOCATION >::Access(ADDRINT addr, UINT32 size, ACCESS_TYPE accessType, ADDRINT &evicted_line)
 {
     const ADDRINT highAddr = addr + size;
     bool allHit            = true;
@@ -385,14 +420,19 @@ bool CACHE< SET, MAX_SETS, STORE_ALLOCATION >::Access(ADDRINT addr, UINT32 size,
         SplitAddress(addr, tag, setIndex);
 
         SET& set = _sets[setIndex];
+        set.curtime++;
 
-        bool localHit = set.Find(tag);
+        bool localHit = set.Find(tag, (accessType==ACCESS_TYPE_STORE));
         allHit &= localHit;
 
         // on miss, loads always allocate, stores optionally
         if ((!localHit) && (accessType == ACCESS_TYPE_LOAD || STORE_ALLOCATION == CACHE_ALLOC::STORE_ALLOCATE))
         {
-            set.Replace(tag);
+            evicted_line=set.Replace(tag,(accessType==ACCESS_TYPE_STORE));
+            if(evicted_line!=0){
+                //evicted_line=(evicted_line<<_lineShift) | setIndex;
+                evicted_line=undoSplit(evicted_line);
+            }
         }
 
         addr = (addr & notLineMask) + lineSize; // start of next cache line
@@ -408,7 +448,7 @@ bool CACHE< SET, MAX_SETS, STORE_ALLOCATION >::Access(ADDRINT addr, UINT32 size,
  *  @return true if accessed cache line hits
  */
 template< class SET, UINT32 MAX_SETS, UINT32 STORE_ALLOCATION >
-bool CACHE< SET, MAX_SETS, STORE_ALLOCATION >::AccessSingleLine(ADDRINT addr, ACCESS_TYPE accessType)
+bool CACHE< SET, MAX_SETS, STORE_ALLOCATION >::AccessSingleLine(ADDRINT addr, ACCESS_TYPE accessType, ADDRINT &evicted_line)
 {
     CACHE_TAG tag;
     UINT32 setIndex;
@@ -417,12 +457,16 @@ bool CACHE< SET, MAX_SETS, STORE_ALLOCATION >::AccessSingleLine(ADDRINT addr, AC
 
     SET& set = _sets[setIndex];
 
-    bool hit = set.Find(tag);
+    bool hit = set.Find(tag, (accessType=ACCESS_TYPE_STORE));
 
     // on miss, loads always allocate, stores optionally
     if ((!hit) && (accessType == ACCESS_TYPE_LOAD || STORE_ALLOCATION == CACHE_ALLOC::STORE_ALLOCATE))
     {
-        set.Replace(tag);
+        evicted_line=set.Replace(tag,(accessType==ACCESS_TYPE_STORE));
+        if(evicted_line!=0){
+            //evicted_line=(evicted_line<<_lineShift) | setIndex;
+            evicted_line=undoSplit(evicted_line);
+        }
     }
 
     _access[accessType][hit]++;

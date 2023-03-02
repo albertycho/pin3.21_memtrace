@@ -77,7 +77,8 @@ static UL2::CACHE *ul2[MAX_THREADS];
 namespace UL3
 {
 // 3rd level unified cache: 16 MB, 64 B lines, direct mapped
-const UINT32 cacheSize                         = 32 * MEGA;
+//const UINT32 cacheSize                         = 32 * MEGA;
+const UINT32 cacheSize                         = 4 * MEGA; //per socket
 const UINT32 lineSize                          = 64;
 const UINT32 associativity                     = 8;
 const CACHE_ALLOC::STORE_ALLOCATION allocation = CACHE_ALLOC::STORE_ALLOCATE;
@@ -87,8 +88,8 @@ const UINT32 max_sets = cacheSize / (lineSize * associativity);
 //typedef CACHE_DIRECT_MAPPED(max_sets, allocation) CACHE;
 typedef CACHE_ROUND_ROBIN(max_sets, associativity, allocation) CACHE;
 } // namespace UL3
-static UL3::CACHE ul3("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::associativity);
-//static UL3::CACHE *ul3[MAX_THREADS];
+//static UL3::CACHE ul3("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::associativity);
+static UL3::CACHE *ul3[MAX_THREADS];
 
 
 
@@ -131,26 +132,37 @@ static inline VOID recordAccess(ADDRINT addr, THREADID tid, CACHE_BASE::ACCESS_T
     }
 }
 
-static inline VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid, bool isIns=false) ////TODO add threaID to arg
+static inline VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid, bool dirtyEv_fromL2, bool isIns=false) ////TODO add threaID to arg
 {
+    ADDRINT evicted_line=0;
     //const BOOL ul3hit = ul3[tid]->Access(addr, size, accessType);
-    const BOOL ul3hit = ul3.Access(addr, size, accessType);
+    const BOOL ul3hit = ul3[tid]->Access(addr, size, accessType, evicted_line);
     if(!ul3hit){
-        recordAccess(addr, tid, accessType);
-        if(isIns){
-            fprintf(ins_trace[tid], "%p\n", (void*)(addr));
+        if(!dirtyEv_fromL2){ // if access is from dirtyEvict, it just installs the line from L2, no memory access
+            recordAccess(addr, tid, CACHE_BASE::ACCESS_TYPE_LOAD); //access is read whether load or store. Write is only when dirty eviction
+        }
+        //if(isIns){ //skipping ins_trace for now
+        //    fprintf(ins_trace[tid], "%p\n", (void*)(addr));
+        //}
+        if(evicted_line!=0){
+            recordAccess(evicted_line, tid, CACHE_BASE::ACCESS_TYPE_STORE);
         }
     }
 }
 
 static VOID Ul2Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid, bool isIns=false)
 {
+    ADDRINT evicted_line=0;
     // second level unified cache
-    const BOOL ul2Hit = ul2[tid]->Access(addr, size, accessType);
+    const BOOL ul2Hit = ul2[tid]->Access(addr, size, accessType, evicted_line);
 
     // third level unified cache
     if(!ul2Hit) {
-        Ul3Access(addr, size, accessType, tid, isIns);
+        Ul3Access(addr, size, accessType, tid, false, isIns);
+        //writeback (to next level, L3)
+        if(evicted_line!=0){
+            Ul3Access(evicted_line, 1, CACHE_BASE::ACCESS_TYPE_STORE, tid, true, false);
+        }
     }
 }
 
@@ -181,7 +193,8 @@ static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 
     //// first level I-cache (Got rid of l1/l2 for data cache, keeping IL1
     //const BOOL il1Hit = il1.AccessSingleLine(addr, accessType);
-    const BOOL il1Hit = il1[tid]->AccessSingleLine(addr, accessType);
+    ADDRINT evicted_line=0; //unused for I cache
+    const BOOL il1Hit = il1[tid]->AccessSingleLine(addr, accessType,evicted_line);
     //if (!il1Hit) Ul3Access(addr, size, accessType, tid);
     if (!il1Hit) Ul2Access(addr, size, accessType, tid, true);
 
@@ -332,7 +345,7 @@ VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) {
 
     il1[tid] = new IL1::CACHE("L1 Instruction Cache", IL1::cacheSize, IL1::lineSize, IL1::associativity);
     ul2[tid] = new UL2::CACHE("L2 Unified Cache", UL2::cacheSize, UL2::lineSize, UL2::associativity);
-    //ul3[tid] = new UL3::CACHE("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::associativity);
+    ul3[tid] = new UL3::CACHE("L3 Unified Cache", UL3::cacheSize, UL3::lineSize, UL3::associativity);
 }
 
 extern int main(int argc, char* argv[])

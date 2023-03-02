@@ -25,6 +25,7 @@ KNOB< BOOL > KnobStartFF(KNOB_MODE_WRITEONCE, "pintool", "startFF", "0", "no tra
 
 
 BOOL     inROI[MAX_THREADS];
+BOOL	 inROI_master;
 uint64_t ins_count[MAX_THREADS] = {};
 uint64_t memref_single_count=0;
 uint64_t memref_multi_count=0;
@@ -157,7 +158,9 @@ static VOID Ul2Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessT
 
 static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 {
-    if(!inROI[tid]){
+	BOOL inROI_check = (inROI[tid]) || (inROI_master);
+    if(!inROI_check){
+    //if(!inROI[tid]){
         return;
     }
     
@@ -186,7 +189,9 @@ static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 
 static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid) //TODO add threaID to arg
 {
-    if(!inROI[tid]){
+	BOOL inROI_check = (inROI[tid]) || (inROI_master);
+    if(!inROI_check){
+    //if(!inROI[tid]){
         return;
     } 
     //TODO figure out how to handle memref_multi
@@ -214,7 +219,8 @@ static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE acces
 
 static VOID MemRefSingle(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid) //TODO add threaID to arg
 {
-    if(!inROI[tid]){
+	BOOL inROI_check = (inROI[tid]) || (inROI_master);
+    if(!inROI_check){
         return;
     }
     
@@ -236,6 +242,10 @@ static VOID pin_magic_inst(THREADID tid, ADDRINT value, ADDRINT field){
             case 0x0: //ROI START
                 inROI[tid]=true;
                 std::cout<<"ROI START (tid "<<tid<<")"<<std::endl;
+                break;
+            case 0x1: //ROI START
+				inROI_master=true;
+                std::cout<<"ROI START (MASTER)"<<std::endl;
                 break;
             default:
                 break;
@@ -329,6 +339,13 @@ extern int main(int argc, char* argv[])
 {
     PIN_Init(argc, argv);
 
+    if(KnobStartFF){
+		inROI_master=false;
+	}
+	else{
+		inROI_master=true;
+	}
+	
     //trace = fopen(KnobOutputFile.Value().c_str(), "w");
     INS_AddInstrumentFunction(Instruction, 0);
     PIN_AddFiniFunction(Fini, 0);

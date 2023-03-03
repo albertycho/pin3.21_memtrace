@@ -245,6 +245,6 @@ print("ppscript: objects saved")
 
 allacc = sum(hist_total_access_sharers)
 misc_sum_file = open("misc_stat.txt", "w")
-misc_sum_file.write("Used Memory: "+usedmem_str);
+misc_sum_file.write("Used Memory: "+usedmem_str+"\n");
 misc_sum_file.write("total accesses: "+str( '%.2f'% (float(allacc)/1000000.0))+"Million")
 misc_sum_file.close()

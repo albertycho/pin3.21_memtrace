@@ -186,7 +186,7 @@ static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
     
 
     ins_count[tid]++;
-    if(ins_count[tid] % 1000000000==0){
+    if(ins_count[tid] % 100000000==0){
     //if(ins_count[tid] % 1000==0){ // for testing
         if(ins_count[tid] % 1000000000==0){
             std::cout<<"thread_"<<tid << " ins_count: " << ins_count[tid] / 1000000000 << " B" << std::endl;

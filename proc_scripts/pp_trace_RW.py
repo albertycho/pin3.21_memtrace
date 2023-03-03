@@ -24,8 +24,8 @@ def save_object(obj,fname):
 
 
 ### TODO make this configurable or automate it?
-n_thr = 1;
-thr_offset_val=0;
+n_thr = 16;
+thr_offset_val=2;
 #n_thr_offset = n_thr+thr_offset_val;
 n_thr_offset = n_thr+1;
 
@@ -44,6 +44,7 @@ page_Ws={} #list of all unique pages and their write count
 hist_access_sharers_per_thread=[]
 hist_total_access_sharers=[0]*(n_thr_offset)
 hist_total_access_sharers_R=[0]*(n_thr_offset)
+hist_total_access_sharers_R_toRWpage=[0]*(n_thr_offset)
 hist_total_access_sharers_W=[0]*(n_thr_offset)
 hist_page_sharers=[0]*(n_thr_offset)
 #### split by RW
@@ -172,7 +173,11 @@ for ii in range(len(page_access_counts)):
         curthread_hist_access_sharers[sharers]=curthread_hist_access_sharers[sharers]+pa_count[page]
         hist_total_access_sharers[sharers]=hist_total_access_sharers[sharers]+pa_count[page]
         hist_total_access_sharers_W[sharers]=hist_total_access_sharers_W[sharers]+pa_count_W[page]
-        hist_total_access_sharers_R[sharers]=hist_total_access_sharers_R[sharers]+pa_count_R[page]
+        if(page_Ws[page]!=0):
+            hist_total_access_sharers_R_toRWpage[sharers]=hist_total_access_sharers_R_toRWpage[sharers]+pa_count_R[page]
+            ###asdf
+        else:
+            hist_total_access_sharers_R[sharers]=hist_total_access_sharers_R[sharers]+pa_count_R[page]
     hist_access_sharers_per_thread.append(curthread_hist_access_sharers)
 
 #### 3-2 populate page sharer histogram
@@ -236,6 +241,7 @@ print("Used Memory: "+usedmem_str);
 
 save_object(hist_total_access_sharers, "access_hist.pickle")
 save_object(hist_total_access_sharers_R, "access_hist_R.pickle")
+save_object(hist_total_access_sharers_R_toRWpage, "access_hist_R_toRWpage.pickle")
 save_object(hist_total_access_sharers_W, "access_hist_W.pickle")
 save_object(hist_page_sharers, "page_hist.pickle")
 save_object(hist_page_sharers_R, "page_hist_R.pickle")

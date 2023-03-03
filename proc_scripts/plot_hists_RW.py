@@ -23,6 +23,7 @@ hist_page_sharers_R=load_object("page_hist_R.pickle")
 hist_page_sharers_W=load_object("page_hist_W.pickle")
 hist_total_access_sharers = load_object("access_hist.pickle")
 hist_total_access_sharers_R = load_object("access_hist_R.pickle")
+hist_total_access_sharers_R_toRWpage = load_object("access_hist_R_toRWpage.pickle")
 hist_total_access_sharers_W = load_object("access_hist_W.pickle")
 ##### number of accesses hist
 hist_page_sharers_nacc = load_object("page_hist_nacc.pickle")
@@ -32,6 +33,7 @@ hist_page_sharers_nacc = load_object("page_hist_nacc.pickle")
 allacc = sum(hist_total_access_sharers)
 access_pdf = [x/allacc for x in hist_total_access_sharers]
 access_pdf_R = [x/allacc for x in hist_total_access_sharers_R]
+access_pdf_R_toRWpage = [x/allacc for x in hist_total_access_sharers_R_toRWpage]
 access_pdf_W = [x/allacc for x in hist_total_access_sharers_W]
 
 allpage = sum(hist_page_sharers)
@@ -66,8 +68,12 @@ X_axis = np.arange(len(hist_total_access_sharers))
 
 #iax.bar(X_axis, hist_total_access_sharers)
 #iax.bar(X_axis, access_pdf)
+bottom=np.zeros(len(X_axis))
 iax.bar(X_axis, access_pdf_W, label='Write')
-iax.bar(X_axis, access_pdf_R, label='Read', bottom=access_pdf_W)
+bottom=bottom+access_pdf_W
+iax.bar(X_axis, access_pdf_R_toRWpage, label='Read to RW_page', bottom=bottom)
+bottom=bottom+access_pdf_R_toRWpage
+iax.bar(X_axis, access_pdf_R, label='Read to RO_page', bottom=bottom)
 #iax.bar(X_axis, access_pdf_R, label='Read')
 
 iax.legend()

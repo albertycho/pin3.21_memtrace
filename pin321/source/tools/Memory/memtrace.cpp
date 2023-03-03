@@ -18,6 +18,7 @@ typedef UINT32 CACHE_STATS; // type of cache hit/miss counters
 #include "pin_cache_ac.H"
 
 #define MAX_THREADS 64
+//FILE * trace_sancheck;
 FILE * trace[MAX_THREADS];
 FILE * ins_trace[MAX_THREADS];
 //KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "memtrace.out", "specify output file name");
@@ -97,8 +98,15 @@ static inline VOID dump_tbuf(THREADID tid) { //TODO add threaID to arg
     //added this as an optimization, but doesn't seem to save runtime much :(
     uint64_t tmp_tbi = tb_i[tid];
     for (uint64_t i = 0; i < tmp_tbi; i++) {
-        //fprintf(trace[tid], "%p\n", (void*)(t_buf[tid][i]));
-        fprintf(trace[tid], "%p %d\n", (void*)(t_buf[tid][i]), rw_buf[tid][i]);
+        //original ver where trace was in text
+        //fprintf(trace[tid], "%p %d\n", (void*)(t_buf[tid][i]), rw_buf[tid][i]);
+        //fprintf(trace_sancheck, "%p %d\n", (void*)(t_buf[tid][i]), rw_buf[tid][i]);
+
+        //we don't care about last few bits of addr, so pack RW info in there
+        //uint64_t lsb_unsetter = ~0xF;
+        uint64_t addr_rw = t_buf[tid][i] & ~0xF;
+        addr_rw = addr_rw+rw_buf[tid][i];
+        fwrite(&addr_rw, sizeof(uint64_t), 1,trace[tid]);
     }
     tb_i[tid] = 0;
 }
@@ -178,14 +186,21 @@ static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
     
 
     ins_count[tid]++;
-    if(ins_count[tid] % 10000000==0){
+    if(ins_count[tid] % 1000000000==0){
+    //if(ins_count[tid] % 1000==0){ // for testing
         if(ins_count[tid] % 1000000000==0){
             std::cout<<"thread_"<<tid << " ins_count: " << ins_count[tid] / 1000000000 << " B" << std::endl;
         }
         //Mark timestamp in the trace file
         dump_tbuf(tid);
-        fprintf(trace[tid], "INST_COUNT %ld\n", ins_count[tid]);
-        fprintf(ins_trace[tid], "INST_COUNT %ld\n", ins_count[tid]);
+        //fprintf(trace[tid], "INST_COUNT %ld\n", ins_count[tid]);
+        uint64_t ts_signature=0xc0ffee;
+        fwrite(&ts_signature, sizeof(uint64_t), 1,trace[tid]); //signature for inst count
+        uint64_t tmp_inscount =ins_count[tid];
+        fwrite(  &tmp_inscount, sizeof(uint64_t), 1,trace[tid]);
+
+        //instrace write
+        //fprintf(ins_trace[tid], "INST_COUNT %ld\n", ins_count[tid]);
     }
 
     const UINT32 size                        = 1; // assuming access does not cross cache lines
@@ -329,7 +344,8 @@ VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) {
     //std::string tfname = "memtrace_t" + std::to_string(tid) + ".out";
     std::ostringstream tfname;
     tfname << "memtrace_t" << tid << ".out";
-    trace[tid] = fopen(tfname.str().c_str(), "w");
+    trace[tid] = fopen(tfname.str().c_str(), "wb");
+    //trace_sancheck = fopen("asdf.txt", "w");
 
     std::ostringstream ins_tfname;
     ins_tfname << "ins_memtrace_t" << tid << ".out";

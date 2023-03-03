@@ -24,10 +24,9 @@ def save_object(obj,fname):
 
 
 ### TODO make this configurable or automate it?
-n_thr = 1;
-thr_offset_val=0;
-#n_thr_offset = n_thr+thr_offset_val;
-n_thr_offset = n_thr+1;
+n_thr = 2;
+thr_offset_val=2;
+n_thr_offset = n_thr+thr_offset_val;
 
 pagesize = 4096; #assume 4KB pages
 pagebits = 12;
@@ -80,31 +79,28 @@ print(str(len(mtnames)))
 print("running step1");
 for mtname in mtnames:
     print('reading '+mtname)
-    #f1 = open(mtname,'r')
-    f1 = open(mtname,'rb')
-
-    f2 = open("sancheck_dump.txt",'w')
-
-    #line1 = f1.readline();
-    line1=f1.read(8) #read size of uint64_t
+    f1 = open(mtname,'r')                                                       
+    #f3 = open("zsim_final.out",'w')                                                 
+                                                                                    
+    line1 = f1.readline();
     
     pa_count={}
     pa_count_R={}
     pa_count_W={}
     while line1:
-        cline1 = int.from_bytes(line1, "little", signed=False)
-        #print(str(hex(cline1)))
-        if (cline1==0xc0ffee):
-            line1=f1.read(8);
-            cline1 = int.from_bytes(line1, "little", signed=False) ## use this for time split
-            #print('insts: '+str(cline1))
-            line1=f1.read(8)
+        #if 'CYCLE_COUNT' in line1:
+        if 'INST_COUNT' in line1:
+            line1=f1.readline();
             continue
         else:
-            f2.write(str(hex(cline1))+'\n'); ## for sancheck
-            addr = cline1
+            tmp=line1.split(' ')
+            addr = int(tmp[0],0)
             isW = True
-            if(cline1&1==0):
+            #print(tmp[1]);
+            if(len(tmp)<2):
+                print("invalid entry. run may have crashed")
+                break;
+            if('0' in tmp[1]):
                 isW = False
             #print(addr)
             page = addr >> pagebits;
@@ -138,8 +134,7 @@ for mtname in mtnames:
             else:
                 page_Rs[page]=(page_Rs[page])+1
     
-        #line1 = f1.readline();
-        line1 = f1.read(8);
+        line1 = f1.readline();
     f1.close()
     page_access_counts.append(pa_count);
     page_access_counts_R.append(pa_count_R);

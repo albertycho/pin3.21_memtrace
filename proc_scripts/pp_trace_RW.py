@@ -55,8 +55,6 @@ hist_page_sharers_nacc=[]
 for i in range(10):
     tmparr=[0]*(n_thr_offset)
     hist_page_sharers_nacc.append(tmparr)
-print("sancheck that log2(1)=0, "+str(math.log2(1)))
-print("sancheck that log2(3)=1, VAL: "+str(int((math.log2(3)))))
 
 
 #ignore t0 and 1 for masstree, but for others?
@@ -84,7 +82,7 @@ for mtname in mtnames:
     #f1 = open(mtname,'r')
     f1 = open(mtname,'rb')
 
-    f2 = open("sancheck_dump.txt",'w')
+    #f2 = open("sancheck_dump.txt",'w')
 
     #line1 = f1.readline();
     line1=f1.read(8) #read size of uint64_t
@@ -102,7 +100,7 @@ for mtname in mtnames:
             line1=f1.read(8)
             continue
         else:
-            f2.write(str(hex(cline1))+'\n'); ## for sancheck
+            #f2.write(str(hex(cline1))+'\n'); ## for sancheck
             addr = cline1
             isW = True
             if(cline1&1==0):

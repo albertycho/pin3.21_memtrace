@@ -75,12 +75,12 @@ print(str(len(mtnames)))
     ### separate handle for each trace, put in array
 f_handles = [];
 for mtname in mtnames:
-    f=open(mtname, 'rb')
+    f=open(mtname, 'r')
     f_handles.append(f)
 
 
 trace_not_done = True
-phaselen = 1*1000*1000*1000 #### defined by number of instructions. 
+phaselen = 2*1000*1000*1000 #### defined by number of instructions. 
 next_period = phaselen
 cur_phase = 0
 
@@ -111,31 +111,21 @@ while (trace_not_done):
     p_end_line = 'INST_COUNT '+str(next_period)
     print("phase "+str(cur_phase))
     for f1 in f_handles:
-        line1 = f1.read(8);
+        line1 = f1.readline();
         pa_count={}
         pa_count_R={}
         pa_count_W={}
-        period_not_done=True;
 
-#        while (line1 and (not (p_end_line in line1))):
-        while (line1 and period_not_done):
-            cline1=int.from_bytes(line1, "little", signed=False)
-            #if('INST_COUNT' in line1):
-            if(cline1==0xc0ffee):
+        while (line1 and (not (p_end_line in line1))):
+            if('INST_COUNT' in line1):
                 line1=f1.readline();
-                cline1= int.from_bytes(line1, "little", signed=False) 
-                if(cline1==next_period):
-                    period_not_done=False;
-                    break;
-                else:
-                    line1=f1.readline();
-                    continue
-                #continue
+                continue
             ### do actions
-            addr = cline1
+            tmp=line1.split(' ')
+            addr = int(tmp[0],0)
             isW = True
             #print(tmp[1]);
-            if(cline1&1==0):
+            if('0' in tmp[1]):
                 isW = False
             #print(addr)
             page = addr >> pagebits;
@@ -169,7 +159,7 @@ while (trace_not_done):
             else:
                 page_Rs[page]=(page_Rs[page])+1
     
-            line1 = f1.read(8);
+            line1 = f1.readline();
 
         if (not line1):
             trace_not_done=False

@@ -97,6 +97,7 @@ while (trace_not_done):
     hist_access_sharers_per_thread=[]
     hist_total_access_sharers=[0]*(n_thr_offset)
     hist_total_access_sharers_R=[0]*(n_thr_offset)
+    hist_total_access_sharers_R_toRWpage=[0]*(n_thr_offset)
     hist_total_access_sharers_W=[0]*(n_thr_offset)
     hist_page_sharers=[0]*(n_thr_offset)
     #### split by RW
@@ -206,7 +207,11 @@ while (trace_not_done):
             curthread_hist_access_sharers[sharers]=curthread_hist_access_sharers[sharers]+pa_count[page]
             hist_total_access_sharers[sharers]=hist_total_access_sharers[sharers]+pa_count[page]
             hist_total_access_sharers_W[sharers]=hist_total_access_sharers_W[sharers]+pa_count_W[page]
-            hist_total_access_sharers_R[sharers]=hist_total_access_sharers_R[sharers]+pa_count_R[page]
+            #hist_total_access_sharers_R[sharers]=hist_total_access_sharers_R[sharers]+pa_count_R[page]
+            if(page_Ws[page]!=0):
+                hist_total_access_sharers_R_toRWpage[sharers]=hist_total_access_sharers_R_toRWpage[sharers]+pa_count_R[page]
+            else:
+                hist_total_access_sharers_R[sharers]=hist_total_access_sharers_R[sharers]+pa_count_R[page]
         hist_access_sharers_per_thread.append(curthread_hist_access_sharers)
     
     #### 3-2 populate page sharer histogram
@@ -230,6 +235,7 @@ while (trace_not_done):
     os.mkdir(dirname)
     save_object(hist_total_access_sharers, dirname+"/access_hist.pickle")
     save_object(hist_total_access_sharers_R, dirname+"/access_hist_R.pickle")
+    save_object(hist_total_access_sharers_R_toRWpage, dirname+"/access_hist_R_toRWpage.pickle")
     save_object(hist_total_access_sharers_W, dirname+"/access_hist_W.pickle")
     save_object(hist_page_sharers, dirname+"/page_hist.pickle")
     save_object(hist_page_sharers_R, dirname+"/page_hist_R.pickle")

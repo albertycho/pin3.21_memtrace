@@ -122,8 +122,11 @@ while (trace_not_done):
             cline1=int.from_bytes(line1, "little", signed=False)
             #if('INST_COUNT' in line1):
             if(cline1==0xc0ffee):
-                line1=f1.readline();
+                print('c0ffee read')
+                #line1=f1.readline();
+                line1=f1.read(8);
                 cline1= int.from_bytes(line1, "little", signed=False) 
+                print('inst count: '+str(cline1))
                 if(cline1==next_period):
                     period_not_done=False;
                     break;
@@ -222,7 +225,7 @@ while (trace_not_done):
             ii=9
         hist_page_sharers_nacc[ii][sharers] =  (hist_page_sharers_nacc[ii][sharers]) +1
 
-    dirname = "2Bphase"+str(cur_phase)
+    dirname = "1Bphase"+str(cur_phase)
     os.mkdir(dirname)
     save_object(hist_total_access_sharers, dirname+"/access_hist.pickle")
     save_object(hist_total_access_sharers_R, dirname+"/access_hist_R.pickle")

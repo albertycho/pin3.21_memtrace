@@ -80,7 +80,7 @@ for mtname in mtnames:
 
 
 trace_not_done = True
-phaselen = 2*1000*1000*1000 #### defined by number of instructions. 
+phaselen = 1*1000*1000*1000 #### defined by number of instructions. 
 next_period = phaselen
 cur_phase = 0
 

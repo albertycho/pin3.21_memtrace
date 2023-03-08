@@ -80,7 +80,7 @@ for mtname in mtnames:
 
 
 trace_not_done = True
-phaselen = 1*1000*1000*1000 #### defined by number of instructions. 
+phaselen = 2*1000*1000*1000 #### defined by number of instructions. 
 next_period = phaselen
 cur_phase = 0
 
@@ -131,7 +131,8 @@ while (trace_not_done):
                     period_not_done=False;
                     break;
                 else:
-                    line1=f1.readline();
+                    #line1=f1.readline();
+                    line1=f1.read(8);
                     continue
                 #continue
             ### do actions

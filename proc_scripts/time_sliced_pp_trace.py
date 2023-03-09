@@ -112,6 +112,7 @@ while (trace_not_done):
     p_end_line = 'INST_COUNT '+str(next_period)
     print("phase "+str(cur_phase))
     for f1 in f_handles:
+        print(f1.name)
         line1 = f1.read(8);
         pa_count={}
         pa_count_R={}

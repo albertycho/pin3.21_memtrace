@@ -25,7 +25,7 @@ using trace_instr_format_t = input_instr;
 
 
 trace_instr_format_t curr_instr;
-int champsim_trace_tid = 15; // thr 16 should be a thread of interest for us, for most apps
+THREADID champsim_trace_tid = 15; // thr 16 should be a thread of interest for us, for most apps
 
 std::ofstream champsim_outfile;
 
@@ -185,7 +185,11 @@ static VOID Ul2Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessT
     }
 }
 
-
+void BranchOrNot(UINT32 taken)
+{
+    curr_instr.is_branch = 1;
+    curr_instr.branch_taken = taken;
+}
 
 static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 {
@@ -196,7 +200,7 @@ static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
     }
     if(tid==champsim_trace_tid){
         curr_instr = {};
-        curr_instr.ip = (unsigned long long int)ip;
+        curr_instr.ip = (unsigned long long int)addr;
     }
     
 
@@ -299,7 +303,7 @@ static VOID pin_magic_inst(THREADID tid, ADDRINT value, ADDRINT field){
                 //std::cout<<"ROI START (tid "<<tid<<")"<<std::endl;
                 break;
             case 0x5: //Print Instruction count (dbg, setting FF, etc)
-                std::cout<<"TRACER: MI-5 - Ins Count: "<<instrCount<<std::endl;
+                std::cout<<"TRACER: MI-5 - Ins Count: "<<ins_count[tid]<<std::endl;
                 break;
             default:
                 break;
@@ -310,7 +314,7 @@ static VOID pin_magic_inst(THREADID tid, ADDRINT value, ADDRINT field){
 
 static VOID Instruction(INS ins, VOID* v)
 {
-    THREADID curtid = PIN_ThreadId()
+    THREADID curtid = PIN_ThreadId();
     // all instruction fetches access I-cache
     INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)InsRef, IARG_INST_PTR, IARG_THREAD_ID, IARG_END);
 
@@ -320,6 +324,13 @@ static VOID Instruction(INS ins, VOID* v)
         //std::cout<<"(xchg rbx rbx caught)!"<<std::endl; 
         INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)pin_magic_inst, IARG_THREAD_ID, IARG_REG_VALUE, REG_RBX, IARG_REG_VALUE, REG_RCX, IARG_END);
         //INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)ROI_start, IARG_THREAD_ID, IARG_END);
+    }
+
+    if(curtid==champsim_trace_tid){
+        if(INS_IsBranch(ins))
+        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BranchOrNot, IARG_BRANCH_TAKEN, IARG_END);
+
+
     }
 
     if (!INS_IsStandardMemop(ins)) return;

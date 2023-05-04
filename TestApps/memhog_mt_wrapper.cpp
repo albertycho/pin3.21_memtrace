@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
 	int numthreads = 1;
 	uint64_t start_core = 0;
 	//uint64_t ws_size=8388608;
-	uint64_t ws_size=1024*1024*sizeof(uint64_t);
+	uint64_t ws_size=256*1024*1024*sizeof(uint64_t);
 
 	static const struct option opts[] = {                                       
 		{.name = "num-threads", .has_arg = 1, .flag = NULL, .val = 't'},        
@@ -71,6 +71,7 @@ int main(int argc, char* argv[]) {
 
         uint64_t * marr = (uint64_t *)malloc(arrsize * (sizeof(uint64_t)));
 
+		std::cout<<"wrapper: arrsize: "<<arrsize<<std::endl;
 
 	for (i = 0; i < numthreads; i++) {
 		tpa[i].ws_size = ws_size;

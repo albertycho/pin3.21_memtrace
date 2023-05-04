@@ -10,7 +10,7 @@
 #include <sys/syscall.h>                                                        
 #include <getopt.h>       
 
-#define ARR_SIZE 1024
+#define ARR_SIZE 1024*1024
 
 using namespace std;
 
@@ -45,6 +45,7 @@ void* memhog_thread(void* inarg) {
 	std::cout << "memhogTid: " << tid << std::endl;
 
 	uint64_t array_size = ws_size / sizeof(uint64_t);
+	std::cout<<"memhog: array_size: "<<array_size<<std::endl;
 	//array_size = array_size / 2;
 
 	//uint64_t * hog_arr = (uint64_t*)malloc(array_size*sizeof(uint64_t));

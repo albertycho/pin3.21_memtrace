@@ -99,14 +99,14 @@ static inline VOID dump_tbuf(THREADID tid) { //TODO add threaID to arg
     uint64_t tmp_tbi = tb_i[tid];
     for (uint64_t i = 0; i < tmp_tbi; i++) {
         //original ver where trace was in text
-        //fprintf(trace[tid], "%p %d\n", (void*)(t_buf[tid][i]), rw_buf[tid][i]);
+        fprintf(trace[tid], "%p %d\n", (void*)(t_buf[tid][i]), rw_buf[tid][i]);
         //fprintf(trace_sancheck, "%p %d\n", (void*)(t_buf[tid][i]), rw_buf[tid][i]);
 
         //we don't care about last few bits of addr, so pack RW info in there
         //uint64_t lsb_unsetter = ~0xF;
-        uint64_t addr_rw = t_buf[tid][i] & ~0xF;
-        addr_rw = addr_rw+rw_buf[tid][i];
-        fwrite(&addr_rw, sizeof(uint64_t), 1,trace[tid]);
+        //uint64_t addr_rw = t_buf[tid][i] & ~0xF;
+        //addr_rw = addr_rw+rw_buf[tid][i];
+        //fwrite(&addr_rw, sizeof(uint64_t), 1,trace[tid]);
     }
     tb_i[tid] = 0;
 }
@@ -352,7 +352,8 @@ VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) {
     //std::string tfname = "memtrace_t" + std::to_string(tid) + ".out";
     std::ostringstream tfname;
     tfname << "memtrace_t" << tid << ".out";
-    trace[tid] = fopen(tfname.str().c_str(), "wb");
+    //trace[tid] = fopen(tfname.str().c_str(), "wb");
+    trace[tid] = fopen(tfname.str().c_str(), "w");
     //trace_sancheck = fopen("asdf.txt", "w");
 
     std::ostringstream ins_tfname;
@@ -377,7 +378,6 @@ extern int main(int argc, char* argv[])
     PIN_Init(argc, argv);
 
     if(KnobStartFF){
-		std::cout<<"startFF"<<std::endl;
 		inROI_master=false;
 	}
 	else{

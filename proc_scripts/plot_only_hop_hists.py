@@ -48,15 +48,15 @@ def load_object(filename):
     except Exception as ex:
         print("Error during unpickling object (Possibly unsupported):", ex)
 
-hist_page_sharers=load_object("page_hist.pickle")
-hist_page_sharers_R=load_object("page_hist_R.pickle")
-hist_page_sharers_W=load_object("page_hist_W.pickle")
-hist_total_access_sharers = load_object("access_hist.pickle")
-hist_total_access_sharers_R = load_object("access_hist_R.pickle")
-hist_total_access_sharers_R_toRWpage = load_object("access_hist_R_toRWpage.pickle")
-hist_total_access_sharers_W = load_object("access_hist_W.pickle")
-##### number of accesses hist
-hist_page_sharers_nacc = load_object("page_hist_nacc.pickle")
+#hist_page_sharers=load_object("page_hist.pickle")
+#hist_page_sharers_R=load_object("page_hist_R.pickle")
+#hist_page_sharers_W=load_object("page_hist_W.pickle")
+#hist_total_access_sharers = load_object("access_hist.pickle")
+#hist_total_access_sharers_R = load_object("access_hist_R.pickle")
+#hist_total_access_sharers_R_toRWpage = load_object("access_hist_R_toRWpage.pickle")
+#hist_total_access_sharers_W = load_object("access_hist_W.pickle")
+###### number of accesses hist
+#hist_page_sharers_nacc = load_object("page_hist_nacc.pickle")
 
 hist_hop_W = load_object("hop_hist_W.pickle")
 hist_hop_RO = load_object("hop_hist_RO.pickle")
@@ -66,24 +66,23 @@ hist_hop_W_CI = load_object("hop_hist_W_CI.pickle")
 hist_hop_RO_CI = load_object("hop_hist_RO_CI.pickle")
 hist_hop_RtoRW_CI = load_object("hop_hist_RtoRW_CI.pickle")
 
-allacc = sum(hist_total_access_sharers)
-access_pdf = [x/allacc for x in hist_total_access_sharers]
-access_pdf_R = [x/allacc for x in hist_total_access_sharers_R]
-access_pdf_R_toRWpage = [x/allacc for x in hist_total_access_sharers_R_toRWpage]
-access_pdf_W = [x/allacc for x in hist_total_access_sharers_W]
-
-allpage = sum(hist_page_sharers)
-pages_pdf = [x/allpage for x in hist_page_sharers]
-pages_pdf_W = [x/allpage for x in hist_page_sharers_W]
-pages_pdf_R = [x/allpage for x in hist_page_sharers_R]
-
-
-##### number of accesses hist
-pages_pdf_nacc=[]
-for i in range(len(hist_page_sharers_nacc)):
-    pdf_i = [x/allpage for x in hist_page_sharers_nacc[i]]
-    pages_pdf_nacc.append(pdf_i)
-
+#allacc = sum(hist_total_access_sharers)
+#access_pdf = [x/allacc for x in hist_total_access_sharers]
+#access_pdf_R = [x/allacc for x in hist_total_access_sharers_R]
+#access_pdf_R_toRWpage = [x/allacc for x in hist_total_access_sharers_R_toRWpage]
+#access_pdf_W = [x/allacc for x in hist_total_access_sharers_W]
+#
+#allpage = sum(hist_page_sharers)
+#pages_pdf = [x/allpage for x in hist_page_sharers]
+#pages_pdf_W = [x/allpage for x in hist_page_sharers_W]
+#pages_pdf_R = [x/allpage for x in hist_page_sharers_R]
+#
+#
+###### number of accesses hist
+#pages_pdf_nacc=[]
+#for i in range(len(hist_page_sharers_nacc)):
+#    pdf_i = [x/allpage for x in hist_page_sharers_nacc[i]]
+#    pages_pdf_nacc.append(pdf_i)
 
 
 colors=['tab:green','tab:blue', 'tab:red', 'tab:purple']
@@ -142,7 +141,7 @@ bbox_props = dict(boxstyle='round', facecolor='white', alpha=0.5)
 #plt.text(0.5, 0.95, avg_in_text, ha='center', va='center', transform=plt.gca().transAxes, bbox=bbox_props)
 plt.text(0.5, 0.90, avg_in_text, ha='center', va='center', transform=plt.gca().transAxes, bbox=bbox_props, fontsize=22)
 
-iax.bar(X_axis, np.zeros(len(X_axis)), label='avg_lat: '+str(int(avg_lat))+'ns', color='black')
+#iax.bar(X_axis, np.zeros(len(X_axis)), label='avg_lat: '+str(int(avg_lat))+'ns', color='black')
 for ii in range(len(tp_hist_hop_W_CI)):
     #if(ii==0):
     #    continue
@@ -174,7 +173,16 @@ iax.grid(color='gray', linestyle='--', linewidth=0.2, markevery=int, zorder=1, a
 
 #iax.text(0,0.7,"Total accesses: "+str( '%.2f'% (float(allacc)/1000000.0))+"Million")
 #print("total accesses: "+str( '%.2f'% (float(allacc)/1000000.0))+"Million")
-
+sumindex = len(tp_hist_hop_W_CI[0])-1;
+h0_accs = tp_hist_hop_W_CI[0][sumindex] + tp_hist_hop_RtoRW_CI[0][sumindex] + tp_hist_hop_RO_CI[0][sumindex]
+h1_accs = tp_hist_hop_W_CI[1][sumindex] + tp_hist_hop_RtoRW_CI[1][sumindex] + tp_hist_hop_RO_CI[1][sumindex]
+h2_accs = tp_hist_hop_W_CI[2][sumindex] + tp_hist_hop_RtoRW_CI[2][sumindex] + tp_hist_hop_RO_CI[2][sumindex]
+CI_accs = tp_hist_hop_W_CI[3][sumindex] + tp_hist_hop_RtoRW_CI[3][sumindex] + tp_hist_hop_RO_CI[3][sumindex]
+print("CXL_ISLAND")
+print("0 hop accs: "+str(h0_accs))
+print("1 hop accs: "+str(h1_accs))
+print("2 hop accs: "+str(h2_accs))
+print("CXLI  accs: "+str(CI_accs))
 
 
 plt.gcf().set_size_inches(20, 5)
@@ -231,7 +239,24 @@ ifig.figsize=(30, 10)
 plt.gcf().set_size_inches(20, 5)
 ifig.savefig('hist_hop.png', bbox_inches='tight')
 
-#exit(0)
+sumindex = len(tp_hist_hop_W[0])-1;
+h0_accs = tp_hist_hop_W[0][sumindex] + tp_hist_hop_RtoRW[0][sumindex] + tp_hist_hop_RO[0][sumindex]
+h1_accs = tp_hist_hop_W[1][sumindex] + tp_hist_hop_RtoRW[1][sumindex] + tp_hist_hop_RO[1][sumindex]
+h2_accs = tp_hist_hop_W[2][sumindex] + tp_hist_hop_RtoRW[2][sumindex] + tp_hist_hop_RO[2][sumindex]
+print("Baseline:")
+print("0 hop accs: "+str(h0_accs))
+print("1 hop accs: "+str(h1_accs))
+print("2 hop accs: "+str(h2_accs))
+
+
+exit(0)
+
+
+
+
+
+
+
 
 
 #########Sancheck print############

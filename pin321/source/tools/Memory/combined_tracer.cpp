@@ -220,20 +220,20 @@ void WriteCurrentInstruction(THREADID tid)
     if(tid!=champsim_trace_tid){
         return;
     }
-  if(!inROI[champsim_trace_tid]){
-    return;
-  }
-  if(ins_count[champsim_trace_tid] > champsim_tracedoneins){
-    if(!champsim_trace_done){
-	  champsim_outfile.close();
-      champsim_trace_done=true;
-    }
-    return;
-	  //exit(0);
-  }
-  if (ins_count[champsim_trace_tid] < champsim_skipins){
-    return;
-  }
+//   if(!inROI[champsim_trace_tid]){
+//     return;
+//   }
+//   if(ins_count[champsim_trace_tid] > champsim_tracedoneins){
+//     if(!champsim_trace_done){
+// 	  champsim_outfile.close();
+//       champsim_trace_done=true;
+//     }
+//     return;
+// 	  //exit(0);
+//   }
+//   if (ins_count[champsim_trace_tid] < champsim_skipins){
+//     return;
+//   }
   typename decltype(champsim_outfile)::char_type buf[sizeof(trace_instr_format_t)];
   std::memcpy(buf, &curr_instr, sizeof(trace_instr_format_t));
   champsim_outfile.write(buf, sizeof(trace_instr_format_t));
@@ -443,9 +443,9 @@ static VOID Instruction(INS ins, VOID* v)
         }
 
         // finalize each instruction with this function
-        //INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)ShouldWrite, IARG_THREAD_ID, IARG_END);
-        //INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteCurrentInstruction, IARG_THREAD_ID, IARG_END);
-        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteCurrentInstruction, IARG_THREAD_ID, IARG_END);
+        INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)ShouldWrite, IARG_THREAD_ID, IARG_END);
+        INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteCurrentInstruction, IARG_THREAD_ID, IARG_END);
+        //INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteCurrentInstruction, IARG_THREAD_ID, IARG_END);
 
 
 

@@ -405,6 +405,7 @@ static VOID Instruction(INS ins, VOID* v)
 
     //getting champsim trace for just 1 thread
     if(curtid==champsim_trace_tid){
+        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)ResetCurrentInstruction, IARG_INST_PTR, IARG_THREAD_ID, IARG_END);
         if(INS_IsBranch(ins))
             INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BranchOrNot, IARG_BRANCH_TAKEN, IARG_THREAD_ID, IARG_END);
 

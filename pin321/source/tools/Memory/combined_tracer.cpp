@@ -408,7 +408,7 @@ static VOID Instruction(INS ins, VOID* v)
         if(INS_IsBranch(ins))
             INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BranchOrNot, IARG_BRANCH_TAKEN, IARG_THREAD_ID, IARG_END);
 
-            // instrument register reads
+        // instrument register reads
         UINT32 readRegCount = INS_MaxNumRRegs(ins);
         for(UINT32 i=0; i<readRegCount; i++) 
         {
@@ -427,6 +427,8 @@ static VOID Instruction(INS ins, VOID* v)
                 IARG_PTR, curr_instr.destination_registers, IARG_PTR, curr_instr.destination_registers + NUM_INSTR_DESTINATIONS,
                 IARG_UINT32, regNum, IARG_THREAD_ID, IARG_END);
         }
+
+        // instrument memory reads and writes
         UINT32 memOperands = INS_MemoryOperandCount(ins);
 
         // Iterate over each memory operand of the instruction.
@@ -443,12 +445,8 @@ static VOID Instruction(INS ins, VOID* v)
         }
 
         // finalize each instruction with this function
-        INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)ShouldWrite, IARG_THREAD_ID, IARG_END);
-        INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteCurrentInstruction, IARG_THREAD_ID, IARG_END);
-        //INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteCurrentInstruction, IARG_THREAD_ID, IARG_END);
-
-
-
+        INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)ShouldWrite,IARG_THREAD_ID, IARG_END);
+        INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteCurrentInstruction,IARG_THREAD_ID, IARG_END);
     }
 
     if (!INS_IsStandardMemop(ins)) return;

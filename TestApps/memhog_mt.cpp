@@ -58,6 +58,12 @@ void* memhog_thread(void* inarg) {
             arr[i]=i;
         }
         int sum=0;
+		uint64_t dummyval;
+		__asm__ __volatile__(
+            "xchg %%rbx, %%rbx;"
+            ::"b"((uint64_t)(&dummyval)),"c"((uint64_t)0x5) //clobbered registers
+        );
+
         for (int i=0; i<array_size;i++){
             sum+=arr[i];
         }

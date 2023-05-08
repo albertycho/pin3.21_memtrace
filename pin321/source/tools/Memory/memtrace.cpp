@@ -283,6 +283,9 @@ static VOID pin_magic_inst(THREADID tid, ADDRINT value, ADDRINT field){
                 inROI[tid]=false;
                 //std::cout<<"ROI START (tid "<<tid<<")"<<std::endl;
                 break;
+            case 0x5: //Print Instruction count (dbg, setting FF, etc)
+                std::cout<<"TRACER: MI-5 - Ins Count: "<<instrCount<<std::endl;
+                break;
             default:
                 break;
 

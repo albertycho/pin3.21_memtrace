@@ -31,10 +31,14 @@ std::ofstream champsim_outfile;
 
 //FILE * trace_sancheck;
 FILE * trace[MAX_THREADS];
-FILE * ins_trace[MAX_THREADS];
+//FILE * ins_trace[MAX_THREADS];
 //KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "memtrace.out", "specify output file name");
 KNOB< BOOL > KnobStartFF(KNOB_MODE_WRITEONCE, "pintool", "startFF", "0", "no trace until ROI start indicated");
+KNOB<UINT64> KnobSkipInstructions(KNOB_MODE_WRITEONCE, "pintool", "s", "0", 
+        "How many instructions to skip before tracing begins");
 
+KNOB<UINT64> KnobTraceInstructions(KNOB_MODE_WRITEONCE, "pintool", "t", "1000000", 
+        "How many instructions to trace");
 
 BOOL     inROI[MAX_THREADS];
 BOOL	 inROI_master;
@@ -42,6 +46,11 @@ uint64_t ins_count[MAX_THREADS] = {};
 uint64_t memref_single_count=0;
 uint64_t memref_multi_count=0;
 uint64_t num_maccess[MAX_THREADS] = {};
+
+uint64_t champsim_skipins=0;
+uint64_t champsim_traceins=2000000000; //2B inst by default
+uint64_t champsim_tracedoneins=2000000000; //skipins+traceins
+bool champsim_trace_done=false;
 
 //intermediate data structure to batch write to file
 #define TBUF_SIZE 1024
@@ -105,7 +114,7 @@ static UL3::CACHE *ul3[MAX_THREADS];
 
 
 
-static inline VOID dump_tbuf(THREADID tid) { //TODO add threaID to arg  
+static inline VOID dump_tbuf(THREADID tid) { //TODO add threaID to arg
     //added this as an optimization, but doesn't seem to save runtime much :(
     uint64_t tmp_tbi = tb_i[tid];
     for (uint64_t i = 0; i < tmp_tbi; i++) {
@@ -138,7 +147,7 @@ VOID ThreadFini(THREADID tid, const CONTEXT* ctxt, INT32 code, VOID* v) {
     std::cout <<"thread_"<<tid << " num mem accesses: " << num_maccess[tid] << std::endl;
     std::cout << "thread_" << tid << " Fini finished" << std::endl;
     fclose(trace[tid]);
-    fclose(ins_trace[tid]);
+    //fclose(ins_trace[tid]);
 }
 
 static inline VOID recordAccess(ADDRINT addr, THREADID tid, CACHE_BASE::ACCESS_TYPE accessType) { //TODO add threaID to arg
@@ -185,12 +194,80 @@ static VOID Ul2Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessT
     }
 }
 
-void BranchOrNot(UINT32 taken)
+BOOL ShouldWrite(THREADID tid)
+{//TODO rewrite
+
+  if(tid!=champsim_trace_tid){
+        return false;
+  }
+  if(!inROI[champsim_trace_tid]){
+    return false;
+  }
+  if(ins_count[champsim_trace_tid] > champsim_tracedoneins){
+    if(!champsim_trace_done){
+	  champsim_outfile.close();
+      champsim_trace_done=true;
+    }
+    return false;
+	  //exit(0);
+  }
+  return (ins_count[champsim_trace_tid] > champsim_skipins);
+  //return (instrCount > KnobSkipInstructions.Value()) && (instrCount <= (KnobTraceInstructions.Value()+KnobSkipInstructions.Value()));
+}
+
+void WriteCurrentInstruction(THREADID tid)
 {
+    if(tid!=champsim_trace_tid){
+        return;
+    }
+  if(!inROI[champsim_trace_tid]){
+    return;
+  }
+  if(ins_count[champsim_trace_tid] > champsim_tracedoneins){
+    if(!champsim_trace_done){
+	  champsim_outfile.close();
+      champsim_trace_done=true;
+    }
+    return;
+	  //exit(0);
+  }
+  if (ins_count[champsim_trace_tid] < champsim_skipins){
+    return;
+  }
+  typename decltype(champsim_outfile)::char_type buf[sizeof(trace_instr_format_t)];
+  std::memcpy(buf, &curr_instr, sizeof(trace_instr_format_t));
+  champsim_outfile.write(buf, sizeof(trace_instr_format_t));
+}
+void BranchOrNot(UINT32 taken, THREADID tid)
+{
+    if(tid!=champsim_trace_tid){
+        return;
+    }
     curr_instr.is_branch = 1;
     curr_instr.branch_taken = taken;
 }
-
+template <typename T>
+void WriteToSet(T* begin, T* end, UINT32 r, THREADID tid)
+{
+    if(tid!=champsim_trace_tid){
+        return;
+    }
+    if(champsim_trace_done){ return;}
+    if(ins_count[champsim_trace_tid] < champsim_skipins){
+        return;
+    }
+  auto set_end = std::find(begin, end, 0);
+  auto found_reg = std::find(begin, set_end, r); // check to see if this register is already in the list
+  *found_reg = r;
+}
+void ResetCurrentInstruction(VOID *ip, THREADID tid)
+{
+    if(tid!=champsim_trace_tid){
+        return;
+    }
+    curr_instr = {};
+    curr_instr.ip = (unsigned long long int)ip;
+}
 static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 {
 	BOOL inROI_check = (inROI[tid]) || (inROI_master);
@@ -198,11 +275,11 @@ static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
     //if(!inROI[tid]){
         return;
     }
-    if(tid==champsim_trace_tid){
-        curr_instr = {};
-        curr_instr.ip = (unsigned long long int)addr;
-    }
-    
+    // if(tid==champsim_trace_tid){
+    //     curr_instr = {};
+    //     curr_instr.ip = (unsigned long long int)addr;
+    // }
+
 
     ins_count[tid]++;
     if(ins_count[tid] % 100000000==0){
@@ -240,7 +317,7 @@ static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE acces
     if(!inROI_check){
     //if(!inROI[tid]){
         return;
-    } 
+    }
     //TODO figure out how to handle memref_multi
     //Ul3Access(addr, size, accessType, tid);
     Ul2Access(addr, size, accessType, tid);
@@ -270,7 +347,7 @@ static VOID MemRefSingle(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE acce
     if(!inROI_check){
         return;
     }
-    
+
     //Ul3Access(addr, size, accessType, tid);
     Ul2Access(addr, size, accessType, tid);
     return;
@@ -280,7 +357,7 @@ static VOID MemRefSingle(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE acce
     //DBG for all accesses
     //fprintf(trace, "%p\n", (void *)addr);
     //return;
-    
+
 
 }
 
@@ -321,14 +398,55 @@ static VOID Instruction(INS ins, VOID* v)
     // MAGIC INSTRUCTIONS
     // start ROI if started 'FF'
     if (INS_IsXchg(ins) && INS_OperandReg(ins, 0) == REG_RBX && INS_OperandReg(ins, 1) == REG_RBX) {
-        //std::cout<<"(xchg rbx rbx caught)!"<<std::endl; 
+        //std::cout<<"(xchg rbx rbx caught)!"<<std::endl;
         INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)pin_magic_inst, IARG_THREAD_ID, IARG_REG_VALUE, REG_RBX, IARG_REG_VALUE, REG_RCX, IARG_END);
         //INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)ROI_start, IARG_THREAD_ID, IARG_END);
     }
 
+    //getting champsim trace for just 1 thread
     if(curtid==champsim_trace_tid){
         if(INS_IsBranch(ins))
-        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BranchOrNot, IARG_BRANCH_TAKEN, IARG_END);
+            INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BranchOrNot, IARG_BRANCH_TAKEN, IARG_THREAD_ID, IARG_END);
+
+            // instrument register reads
+        UINT32 readRegCount = INS_MaxNumRRegs(ins);
+        for(UINT32 i=0; i<readRegCount; i++) 
+        {
+            UINT32 regNum = INS_RegR(ins, i);
+            INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet<unsigned char>,
+                IARG_PTR, curr_instr.source_registers, IARG_PTR, curr_instr.source_registers + NUM_INSTR_SOURCES,
+                IARG_UINT32, regNum, IARG_THREAD_ID, IARG_END);
+        }
+
+        // instrument register writes
+        UINT32 writeRegCount = INS_MaxNumWRegs(ins);
+        for(UINT32 i=0; i<writeRegCount; i++) 
+        {
+            UINT32 regNum = INS_RegW(ins, i);
+            INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet<unsigned char>,
+                IARG_PTR, curr_instr.destination_registers, IARG_PTR, curr_instr.destination_registers + NUM_INSTR_DESTINATIONS,
+                IARG_UINT32, regNum, IARG_THREAD_ID, IARG_END);
+        }
+        UINT32 memOperands = INS_MemoryOperandCount(ins);
+
+        // Iterate over each memory operand of the instruction.
+        for (UINT32 memOp = 0; memOp < memOperands; memOp++) 
+        {
+            if (INS_MemoryOperandIsRead(ins, memOp)) 
+                INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet<unsigned long long int>,
+                    IARG_PTR, curr_instr.source_memory, IARG_PTR, curr_instr.source_memory + NUM_INSTR_SOURCES,
+                    IARG_MEMORYOP_EA, memOp, IARG_THREAD_ID, IARG_END);
+            if (INS_MemoryOperandIsWritten(ins, memOp)) 
+                INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet<unsigned long long int>,
+                    IARG_PTR, curr_instr.destination_memory, IARG_PTR, curr_instr.destination_memory + NUM_INSTR_DESTINATIONS,
+                    IARG_MEMORYOP_EA, memOp, IARG_THREAD_ID, IARG_END);
+        }
+
+        // finalize each instruction with this function
+        //INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)ShouldWrite, IARG_THREAD_ID, IARG_END);
+        //INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteCurrentInstruction, IARG_THREAD_ID, IARG_END);
+        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteCurrentInstruction, IARG_THREAD_ID, IARG_END);
+
 
 
     }
@@ -375,9 +493,9 @@ static VOID Instruction(INS ins, VOID* v)
     }
 }
 
-VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) { 
+VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) {
     std::cout << "thread_" << tid<< " start" << std::endl;
-    numThreads++; 
+    numThreads++;
     //std::string tfname = "memtrace_t" + std::to_string(tid) + ".out";
     std::ostringstream tfname;
     tfname << "memtrace_t" << tid << ".out";
@@ -386,7 +504,7 @@ VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) {
 
     std::ostringstream ins_tfname;
     ins_tfname << "ins_memtrace_t" << tid << ".out";
-    ins_trace[tid] = fopen(ins_tfname.str().c_str(), "w");
+    //ins_trace[tid] = fopen(ins_tfname.str().c_str(), "w");
 
     if(KnobStartFF){
         inROI[tid]=false;
@@ -394,7 +512,7 @@ VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) {
     else{
         inROI[tid]=true;
     }
-    
+
 
     il1[tid] = new IL1::CACHE("L1 Instruction Cache", IL1::cacheSize, IL1::lineSize, IL1::associativity);
     ul2[tid] = new UL2::CACHE("L2 Unified Cache", UL2::cacheSize, UL2::lineSize, UL2::associativity);
@@ -412,6 +530,9 @@ extern int main(int argc, char* argv[])
 	else{
 		inROI_master=true;
 	}
+    champsim_skipins  = KnobSkipInstructions.Value();
+    champsim_traceins = KnobTraceInstructions.Value();
+    champsim_tracedoneins = champsim_skipins+champsim_traceins;
 
     champsim_outfile.open("champsim.trace", std::ios_base::binary | std::ios_base::trunc);
     if (!champsim_outfile)
@@ -419,11 +540,11 @@ extern int main(int argc, char* argv[])
       std::cout << "Couldn't open output trace file. Exiting." << std::endl;
         exit(1);
     }
-	
+
     //trace = fopen(KnobOutputFile.Value().c_str(), "w");
     INS_AddInstrumentFunction(Instruction, 0);
     PIN_AddFiniFunction(Fini, 0);
-    
+
     PIN_AddThreadStartFunction(ThreadStart, 0);
     PIN_AddThreadFiniFunction(ThreadFini, 0);
 

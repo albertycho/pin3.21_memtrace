@@ -10,39 +10,23 @@ import matplotlib
 import matplotlib.pyplot as plt 
 
 import pickle
-import csv
 
 def load_object(filename):
     try:
-        with open(filename, 'r') as file:
-            # Use a list comprehension to create a list where each element is a line from the file
-            # Use .strip() to remove any trailing newline characters, and int() to convert the string to an integer
-            numbers = [int(line.strip()) for line in file]
-            return numbers
+        with open(filename, "rb") as f:
+            return pickle.load(f)
     except Exception as ex:
-        print("Error during reading object (Possibly unsupported):", ex)
+        print("Error during unpickling object (Possibly unsupported):", ex)
 
-def load_2darr(filename):
-    with open(filename, 'r') as f:
-        reader = csv.reader(f)
-        array = list(map(lambda row: list(map(int, row)), list(reader)))
-        return array
-    
-
-
-
-
-hist_page_sharers=load_object("page_hist.txt")
-hist_page_sharers_R=load_object("page_hist_R.txt")
-hist_page_sharers_W=load_object("page_hist_W.txt")
-hist_total_access_sharers = load_object("access_hist.txt")
-hist_total_access_sharers_R = load_object("access_hist_R.txt")
-hist_total_access_sharers_R_toRWpage = load_object("access_hist_R_to_RWP.txt")
-hist_total_access_sharers_W = load_object("access_hist_W.txt")
+hist_page_sharers=load_object("page_hist.pickle")
+hist_page_sharers_R=load_object("page_hist_R.pickle")
+hist_page_sharers_W=load_object("page_hist_W.pickle")
+hist_total_access_sharers = load_object("access_hist.pickle")
+hist_total_access_sharers_R = load_object("access_hist_R.pickle")
+hist_total_access_sharers_R_toRWpage = load_object("access_hist_R_toRWpage.pickle")
+hist_total_access_sharers_W = load_object("access_hist_W.pickle")
 ##### number of accesses hist
-hist_page_sharers_nacc = load_2darr("page_hist_nacc.txt")
-
-print(hist_page_sharers)
+hist_page_sharers_nacc = load_object("page_hist_nacc.pickle")
 
 print(hist_total_access_sharers)
 
@@ -58,7 +42,7 @@ pages_pdf_W = [x/allpage for x in hist_page_sharers_W]
 pages_pdf_R = [x/allpage for x in hist_page_sharers_R]
 
 
-###### number of accesses hist
+##### number of accesses hist
 pages_pdf_nacc=[]
 for i in range(len(hist_page_sharers_nacc)):
     pdf_i = [x/allpage for x in hist_page_sharers_nacc[i]]
@@ -125,7 +109,6 @@ iax.grid(color='gray', linestyle='--', linewidth=0.2, markevery=int, zorder=1, a
 ifig.figsize=(20, 10)
 ifig.savefig('hist_pages_RW.png', bbox_inches='tight')
 
-#exit(0)
 
 ### PLOT PAGES HIST by NACC
 ifig,iax=plt.subplots()

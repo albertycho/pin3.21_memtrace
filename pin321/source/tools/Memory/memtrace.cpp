@@ -277,7 +277,7 @@ static VOID pin_magic_inst(THREADID tid, ADDRINT value, ADDRINT field){
                 break;
             case 0x3: //ROI START (same as 0 but don't print anything
                 inROI[tid]=true;
-                //std::cout<<"ROI START (tid "<<tid<<")"<<std::endl;
+                std::cout<<"ROI START (tid "<<tid<<")"<<std::endl;
                 break;
             case 0x4: //ROI END
                 inROI[tid]=false;

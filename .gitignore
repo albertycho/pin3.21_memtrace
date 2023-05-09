@@ -24,3 +24,4 @@ TestApps/simple_array
 /.vs/pin3.21_memtrace/v16
 .vscode/settings.json
 pin321/source/tools/Memory/obj-intel64/*
+proc_scripts/pp_trace

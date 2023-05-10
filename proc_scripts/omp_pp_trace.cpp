@@ -149,6 +149,8 @@ int process_phase(){
 		unordered_map<uint64_t, uint64_t> pa_count;
 		unordered_map<uint64_t, uint64_t> pa_count_R;
 		unordered_map<uint64_t, uint64_t> pa_count_W;
+		unordered_map<uint64_t, uint64_t> page_Rs_tmp;
+		unordered_map<uint64_t, uint64_t> page_Ws_tmp;
 		//trace[i]->read(buffer, sizeof(buffer));
 		//size_t readsize = std::fread(buffer, sizeof(char), sizeof(buffer), trace[i]);
 		//std::memcpy(&buf_val, buffer, sizeof(buf_val));
@@ -200,14 +202,14 @@ int process_phase(){
 
 			//increment R and Ws
 			if(isW){
-				omp_set_lock(&page_W_lock);
-				page_Ws[page]=page_Ws[page]+1;
-				omp_unset_lock(&page_W_lock);
+				//omp_set_lock(&page_W_lock);
+				page_Ws_tmp[page]=page_Ws_tmp[page]+1;
+				//omp_unset_lock(&page_W_lock);
 			}
 			else{
-				omp_set_lock(&page_R_lock);
-				page_Rs[page]=page_Rs[page]+1;
-				omp_unset_lock(&page_R_lock);
+				//omp_set_lock(&page_R_lock);
+				page_Rs_tmp[page]=page_Rs_tmp[page]+1;
+				//omp_unset_lock(&page_R_lock);
 			}
 
 			
@@ -219,6 +221,21 @@ int process_phase(){
 			page_access_counts_W.push_back(pa_count_W);
 			page_access_counts_R.push_back(pa_count_R);
 		}
+		for (const auto& pw : page_Ws_tmp) {
+			U64 page = pw.first;
+			U64 tmp_accs = pw.second;
+			omp_set_lock(&page_W_lock);
+			page_Ws[page]=page_Ws[page]+tmp_accs;
+			omp_unset_lock(&page_W_lock);
+		}
+		for (const auto& pw : page_Rs_tmp) {
+			U64 page = pw.first;
+			U64 tmp_accs = pw.second;
+			omp_set_lock(&page_R_lock);
+			page_Rs[page]=page_Rs[page]+tmp_accs;
+			omp_unset_lock(&page_R_lock);
+		}
+
 	}
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// log sharers for each page  
@@ -308,6 +325,8 @@ int process_phase(){
 	savearray(hist_page_sharers_R, N_THR_OFFSET,"page_hist_R.txt\0");
 	save2Darr(hist_page_shareres_nacc, N_THR_OFFSET, "page_hist_nacc.txt\0");
 
+	U64 nompt=omp_get_num_threads();
+	cout<<"omp threads: "<<nompt<<endl;
 	return 0;
 }
 

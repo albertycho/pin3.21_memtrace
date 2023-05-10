@@ -139,9 +139,6 @@ int process_phase(){
 		unordered_map<uint64_t, uint64_t> pa_count;
 		unordered_map<uint64_t, uint64_t> pa_count_R;
 		unordered_map<uint64_t, uint64_t> pa_count_W;
-		//trace[i]->read(buffer, sizeof(buffer));
-		//size_t readsize = std::fread(buffer, sizeof(char), sizeof(buffer), trace[i]);
-		//std::memcpy(&buf_val, buffer, sizeof(buf_val));
 
 		size_t readsize = read_8B_line(&buf_val, buffer, trace[i]);
 		while(readsize==8){

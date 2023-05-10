@@ -16,6 +16,8 @@
 #include <stack>
 #include <set>
 #include <unordered_map>
+#include <omp.h>
+
 
 #define PAGESIZE 4096
 #define PAGEBITS 12
@@ -27,6 +29,9 @@
 using namespace std;
 
 FILE * trace[N_THR];
+
+omp_lock_t page_W_lock;
+omp_lock_t page_R_lock;
 
 vector<unordered_map<uint64_t, uint64_t>> page_access_counts_dummy;
 // vector<unordered_map<uint64_t, uint64_t>> page_access_counts_R(N_THR);
@@ -125,11 +130,16 @@ int process_phase(){
 	uint64_t hist_page_shareres_nacc[10][N_THR_OFFSET]={0};
 
 
-	char buffer[8];
-	uint64_t buf_val;
 
-	U64 total_num_accs=0;
+
+	U64 total_num_accs[N_THR]={0};
+	//omp_set_num_threads(4);
+	//U64 nompt=omp_get_num_threads();
+	//cout<<"omp threads: "<<nompt<<endl;
+	#pragma omp parallel for
 	for (int i=0; i<N_THR;i++){
+		U64 nompt=omp_get_num_threads();
+		cout<<"omp threads: "<<nompt<<endl;
 	//for (int i=0; i<1;i++){ // for unit testing
 		cout<<"processing thread "<<i<<endl;
 		//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -142,7 +152,8 @@ int process_phase(){
 		//trace[i]->read(buffer, sizeof(buffer));
 		//size_t readsize = std::fread(buffer, sizeof(char), sizeof(buffer), trace[i]);
 		//std::memcpy(&buf_val, buffer, sizeof(buf_val));
-
+		char buffer[8];
+		uint64_t buf_val;
 		size_t readsize = read_8B_line(&buf_val, buffer, trace[i]);
 		while(readsize==8){
 			if(buf_val==0xc0ffee){ // 1B inst phase done
@@ -153,7 +164,7 @@ int process_phase(){
 
 				break;
 			}
-			total_num_accs++;
+			//total_num_accs[i]++;
 
 			//parse page and RW
 			U64 addr = buf_val;
@@ -186,28 +197,28 @@ int process_phase(){
 				//pa_count[page]=pa_count[page+1];
 			}
 
-			//update page sharers if necessary
-			// auto ps_it = page_sharers.find(page);
-			// if(ps_it==page_sharers.end()){ 
-			// 	// idk if this whole thing is necessary. will see if code works wihtout
-			// 	page_sharers[page]=0; 
-			// 	page_Rs[page]=0;
-			// 	page_Ws[page]=0;
-			// }
 
 			//increment R and Ws
 			if(isW){
+				omp_set_lock(&page_W_lock);
 				page_Ws[page]=page_Ws[page]+1;
+				omp_unset_lock(&page_W_lock);
 			}
 			else{
+				omp_set_lock(&page_R_lock);
 				page_Rs[page]=page_Rs[page]+1;
+				omp_unset_lock(&page_R_lock);
 			}
+
 			
 			readsize = read_8B_line(&buf_val, buffer, trace[i]);
 		}
-		page_access_counts.push_back(pa_count);
-		page_access_counts_W.push_back(pa_count_W);
-		page_access_counts_R.push_back(pa_count_R);
+		#pragma omp critical
+		{
+			page_access_counts.push_back(pa_count);
+			page_access_counts_W.push_back(pa_count_W);
+			page_access_counts_R.push_back(pa_count_R);
+		}
 	}
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// log sharers for each page  
@@ -279,7 +290,12 @@ int process_phase(){
 	U64 total_pages = page_sharers.size();
 	U64 memory_touched = total_pages*PAGESIZE;
 	cout<<"total memory touched in this phase: "<<memory_touched<<endl;
-	cout<<"total number of accesses in  this phase: "<<total_num_accs<<endl;
+	// cout<<"total number of accesses in  this phase by t0: "<<total_num_accs[0]<<endl;
+	// U64 sumallacc=0;
+	// for(U64 i=0;i<N_THR;i++){
+	// 	sumallacc+=total_num_accs[i];
+	// }
+	// cout<<"total number of accesses in  this phase by all t: "<<sumallacc<<endl;
 
 	char namebuf[50];
 	//namebuf="myarray\0";
@@ -316,6 +332,9 @@ int expmain(){
 
 
 int main(){
+
+	omp_init_lock(&page_W_lock);
+	omp_init_lock(&page_R_lock);
 
 	for(int i=0; i<N_THR;i++){
 		std::ostringstream tfname;

@@ -23,7 +23,8 @@
 #define PAGESIZE 4096
 #define PAGEBITS 12
 #define N_THR 16
-#define THR_OFFSET_VAL 2
+//#define THR_OFFSET_VAL 2
+#define THR_OFFSET_VAL 0
 #define N_THR_OFFSET (N_THR+1)
 #define U64 uint64_t
 #define CXO 100 //CXL Island is owner
@@ -179,6 +180,7 @@ U64 gethop(U64 a, U64 b){
 }
 
 int process_phase(){
+	cout<<"starting phase "<<curphase<<endl;
 	phase_end_cycle=phase_end_cycle+PHASE_CYCLES;
 	//page accesses
 	vector<unordered_map<uint64_t, uint64_t>> page_access_counts;
@@ -213,9 +215,9 @@ int process_phase(){
 	#pragma omp parallel for
 	for (int i=0; i<N_THR;i++){
 		U64 nompt=omp_get_num_threads();
-		cout<<"omp threads: "<<nompt<<endl;
+		//cout<<"omp threads: "<<nompt<<endl;
 	//for (int i=0; i<1;i++){ // for unit testing
-		cout<<"processing thread "<<i<<endl;
+		//cout<<"processing thread "<<i<<endl;
 		//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 		// Read Trace and get page access counts
 		//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -233,11 +235,11 @@ int process_phase(){
 		size_t readsize = read_8B_line(&buf_val, buffer, trace[i]);
 		while(readsize==8){
 			if(buf_val==0xc0ffee){ // 1B inst phase done
-				cout<<"coffee read in buf_val"<<endl;
 				read_8B_line(&buf_val, buffer, trace[i]);
-				cout<<"inst count: "<<buf_val<<endl;
+				//cout<<"inst count: "<<buf_val<<endl;
 				//TODO - check(assertion) if end of phase inst  count checks out
 				if(buf_val>=phase_end_cycle){
+					//cout<<"inst count: "<<buf_val<<endl;
 					break;
 				}
 				else{

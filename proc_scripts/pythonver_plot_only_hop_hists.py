@@ -10,7 +10,7 @@ import matplotlib
 import matplotlib.pyplot as plt 
 
 import pickle
-import csv
+
 
 lats=[80,130,300,200]
 
@@ -39,11 +39,6 @@ def add_sum(TDL): ##take in hophist and add sum for 0,1,2,3 hops
     retarr.append(tmp)
     return retarr;
 
-def load_2darr(filename):
-    with open(filename, 'r') as f:
-        reader = csv.reader(f)
-        array = list(map(lambda row: list(map(int, row)), list(reader)))
-        return array
 
 
 def load_object(filename):
@@ -63,22 +58,13 @@ def load_object(filename):
 ###### number of accesses hist
 #hist_page_sharers_nacc = load_object("page_hist_nacc.pickle")
 
-#hist_hop_W = load_object("hop_hist_W.pickle")
-#hist_hop_RO = load_object("hop_hist_RO.pickle")
-#hist_hop_RtoRW = load_object("hop_hist_RtoRW.pickle")
+hist_hop_W = load_object("hop_hist_W.pickle")
+hist_hop_RO = load_object("hop_hist_RO.pickle")
+hist_hop_RtoRW = load_object("hop_hist_RtoRW.pickle")
 
-#hist_hop_W_CI = load_object("hop_hist_W_CI.pickle")
-#hist_hop_RO_CI = load_object("hop_hist_RO_CI.pickle")
-#hist_hop_RtoRW_CI = load_object("hop_hist_RtoRW_CI.pickle")
-
-hist_page_sharers_nacc = load_2darr("page_hist_nacc.txt")
-hist_hop_W = load_2darr("hop_hist_W.txt")
-hist_hop_RO = load_2darr("hop_hist_RO.txt")
-hist_hop_RtoRW = load_2darr("hop_hist_RtoRW.txt")
-
-hist_hop_W_CI = load_2darr("hop_hist_W_CI.txt")
-hist_hop_RO_CI = load_2darr("hop_hist_RO_CI.txt")
-hist_hop_RtoRW_CI = load_2darr("hop_hist_RtoRW_CI.txt")
+hist_hop_W_CI = load_object("hop_hist_W_CI.pickle")
+hist_hop_RO_CI = load_object("hop_hist_RO_CI.pickle")
+hist_hop_RtoRW_CI = load_object("hop_hist_RtoRW_CI.pickle")
 
 #allacc = sum(hist_total_access_sharers)
 #access_pdf = [x/allacc for x in hist_total_access_sharers]
@@ -117,20 +103,10 @@ tp_hist_hop_W=transpose(hist_hop_W)
 tp_hist_hop_RtoRW=transpose(hist_hop_RtoRW)
 tp_hist_hop_RO=transpose(hist_hop_RO)
 
+
 tp_hist_hop_W_CI=transpose(hist_hop_W_CI)
 tp_hist_hop_RtoRW_CI=transpose(hist_hop_RtoRW_CI)
 tp_hist_hop_RO_CI=transpose(hist_hop_RO_CI)
-
-#tp_hist_hop_W=(hist_hop_W)
-#tp_hist_hop_RtoRW=(hist_hop_RtoRW)
-#tp_hist_hop_RO=(hist_hop_RO)
-#
-#tp_hist_hop_W_CI=(hist_hop_W_CI)
-#tp_hist_hop_RtoRW_CI=(hist_hop_RtoRW_CI)
-#tp_hist_hop_RO_CI=(hist_hop_RO_CI)
-
-
-
 
 X_axis = np.arange(len(hist_hop_W))
 

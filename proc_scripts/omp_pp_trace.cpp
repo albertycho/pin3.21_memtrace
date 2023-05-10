@@ -17,7 +17,8 @@
 #include <set>
 #include <unordered_map>
 #include <omp.h>
-
+#include <sys/stat.h> 
+#include <sys/types.h> 
 
 #define PAGESIZE 4096
 #define PAGEBITS 12
@@ -25,6 +26,10 @@
 #define THR_OFFSET_VAL 2
 #define N_THR_OFFSET (N_THR+1)
 #define U64 uint64_t
+#define CXO 100 //CXL Island is owner
+#define SHARER_THRESHOLD 8
+#define INVAL_OWNER 9999
+#define PHASE_CYCLES 1000000000
 
 using namespace std;
 
@@ -32,6 +37,10 @@ FILE * trace[N_THR];
 
 omp_lock_t page_W_lock;
 omp_lock_t page_R_lock;
+omp_lock_t page_owner_lock;
+omp_lock_t page_owner_CI_lock;
+omp_lock_t hop_hist_lock;
+omp_lock_t hop_hist_CI_lock;
 
 vector<unordered_map<uint64_t, uint64_t>> page_access_counts_dummy;
 // vector<unordered_map<uint64_t, uint64_t>> page_access_counts_R(N_THR);
@@ -39,6 +48,12 @@ vector<unordered_map<uint64_t, uint64_t>> page_access_counts_dummy;
 //unordered_map<uint64_t, uint64_t> page_sharers;
 //unordered_map<uint64_t, uint64_t> page_Rs;
 //unordered_map<uint64_t, uint64_t> page_Ws;
+unordered_map<uint64_t, uint64_t> page_owner;
+unordered_map<uint64_t, uint64_t> page_owner_CI;
+
+U64 curphase=0;
+U64 phase_end_cycle=0;
+bool any_trace_done=false;
 
 int addMap(std::vector<std::unordered_map<uint64_t, uint64_t>>& inunordered_map) {
     // Create a unordered_map
@@ -75,9 +90,27 @@ int read_8B_line(uint64_t * buf_val, char* buffer, FILE* fptr){
 	return readsize;
 }
 
+string generate_phasedirname(){
+	stringstream ss;
+	ss<<"1BPhase"<<curphase;
+	string dir_name=ss.str();
+	return dir_name;
+}
+string generate_full_savefilename(string savefilename){
+	string dir_name = generate_phasedirname();
+	stringstream ss;
+	ss<<dir_name<<"/"<<savefilename;
+	string savefilename_full=ss.str();
+	return savefilename_full;
+}
+
 int savearray(U64 * arr, U64 arrsize, string savefilename){
-	std::cout<<savefilename<<endl;
-	ofstream outf(savefilename);
+	// std::cout<<savefilename<<endl;
+	// stringstream ss;
+	// ss<<"1BPhase"<<curphase<<"/"<<savefilename;
+	//string savefilename_full=ss.str();
+	string savefilename_full=generate_full_savefilename(savefilename);
+	ofstream outf(savefilename_full);
 
 	for(U64 i=0; i<arrsize;i++){
 		//std::cout<<arr[i]<<endl;
@@ -88,7 +121,8 @@ int savearray(U64 * arr, U64 arrsize, string savefilename){
 }
 
 int save2Darr(U64 arr[][N_THR_OFFSET], U64 arrsize, string savefilename){
-	std::ofstream file(savefilename);
+	string savefilename_full=generate_full_savefilename(savefilename);
+	std::ofstream file(savefilename_full);
 	//cout<<"does code get here 88"<<endl;
     if (file.is_open()) {
         for (size_t j=0; j<10;j++) {
@@ -107,7 +141,45 @@ int save2Darr(U64 arr[][N_THR_OFFSET], U64 arrsize, string savefilename){
 	return 0;
 }
 
+int save_hophist(U64 arr[][4], U64 arrsize, string savefilename){
+	//std::ofstream file(savefilename);
+	string savefilename_full=generate_full_savefilename(savefilename);
+	std::ofstream file(savefilename_full);
+	//cout<<"does code get here 88"<<endl;
+    if (file.is_open()) {
+        for (size_t j=0; j<arrsize;j++) {
+			//cout<<"j: "<<j<<endl;
+            for (size_t i = 0; i < 4; ++i) {
+				//cout<<"i: "<<i<<endl;
+                file << arr[j][i];
+                if (i != 4 - 1)
+                    file << ",";
+            }
+            file << "\n";
+        }
+    }
+
+    file.close();
+	return 0;
+}
+
+U64 gethop(U64 a, U64 b){
+	if(b==CXO){
+		return 3;
+	}
+	if(a==b){
+		return 0;
+	}
+	U64 agrp=(a>>2);
+	U64 bgrp=(b>>2);
+	if(agrp==bgrp){
+		return 1;
+	}
+	return 2;
+}
+
 int process_phase(){
+	phase_end_cycle=phase_end_cycle+PHASE_CYCLES;
 	//page accesses
 	vector<unordered_map<uint64_t, uint64_t>> page_access_counts;
 	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_R;
@@ -129,13 +201,15 @@ int process_phase(){
 	uint64_t hist_page_sharers_W[N_THR_OFFSET]={0};
 	uint64_t hist_page_shareres_nacc[10][N_THR_OFFSET]={0};
 
-
-
+	uint64_t hop_hist_W[N_THR_OFFSET][4]={0};
+	uint64_t hop_hist_RtoRW[N_THR_OFFSET][4]={0};
+	uint64_t hop_hist_RO[N_THR_OFFSET][4]={0};
+	uint64_t hop_hist_W_CI[N_THR_OFFSET][4]={0};
+	uint64_t hop_hist_RtoRW_CI[N_THR_OFFSET][4]={0};
+	uint64_t hop_hist_RO_CI[N_THR_OFFSET][4]={0};
 
 	U64 total_num_accs[N_THR]={0};
-	//omp_set_num_threads(4);
-	//U64 nompt=omp_get_num_threads();
-	//cout<<"omp threads: "<<nompt<<endl;
+
 	#pragma omp parallel for
 	for (int i=0; i<N_THR;i++){
 		U64 nompt=omp_get_num_threads();
@@ -146,14 +220,14 @@ int process_phase(){
 		// Read Trace and get page access counts
 		//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
+		U64 tmp_numacc=0;
+
 		unordered_map<uint64_t, uint64_t> pa_count;
 		unordered_map<uint64_t, uint64_t> pa_count_R;
 		unordered_map<uint64_t, uint64_t> pa_count_W;
 		unordered_map<uint64_t, uint64_t> page_Rs_tmp;
 		unordered_map<uint64_t, uint64_t> page_Ws_tmp;
-		//trace[i]->read(buffer, sizeof(buffer));
-		//size_t readsize = std::fread(buffer, sizeof(char), sizeof(buffer), trace[i]);
-		//std::memcpy(&buf_val, buffer, sizeof(buf_val));
+
 		char buffer[8];
 		uint64_t buf_val;
 		size_t readsize = read_8B_line(&buf_val, buffer, trace[i]);
@@ -163,10 +237,15 @@ int process_phase(){
 				read_8B_line(&buf_val, buffer, trace[i]);
 				cout<<"inst count: "<<buf_val<<endl;
 				//TODO - check(assertion) if end of phase inst  count checks out
-
-				break;
+				if(buf_val>=phase_end_cycle){
+					break;
+				}
+				else{
+					readsize = read_8B_line(&buf_val, buffer, trace[i]);
+					continue;
+				}
 			}
-			//total_num_accs[i]++;
+			tmp_numacc++;
 
 			//parse page and RW
 			U64 addr = buf_val;
@@ -215,6 +294,12 @@ int process_phase(){
 			
 			readsize = read_8B_line(&buf_val, buffer, trace[i]);
 		}
+		if(readsize!=8){
+			any_trace_done=true;
+		}
+
+		/////////coalescing local stats into one
+		total_num_accs[i]+=tmp_numacc;
 		#pragma omp critical
 		{
 			page_access_counts.push_back(pa_count);
@@ -252,6 +337,7 @@ int process_phase(){
 	// Populate access sharer histogram
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	U64 pac_size = page_access_counts.size();
+	assert(pac_size==N_THR);
 	//for (const auto& pa_c : page_access_counts) {
 	for(U64 i=0; i<pac_size;i++){
 		//unordered_map<uint64_t, uint64_t> pa_c = page_access_counts[i];
@@ -272,6 +358,53 @@ int process_phase(){
 			else{
 				hist_access_sharers_R[sharers]=hist_access_sharers_R[sharers]+rds;
 			}
+	
+			//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+			// Populate hop histogram
+			//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+			U64 owner=i;
+			auto pp_it = page_owner.find(page);
+			if(pp_it==page_owner.end()){ //new page first touch
+				// this will favor thread 0. 
+				// should be ok after the first phase..
+				page_owner[page]=i; 
+				owner=i;
+			}
+			else{
+				owner=pp_it->second;
+			}
+			U64 hop = gethop(i,owner);
+			assert(hop<3);
+			//U64 sharers = page_sharers[page];
+			hop_hist_W[sharers][hop]=hop_hist_W[sharers][hop]+wrs;
+			if(page_Ws[page]!=0){
+				hop_hist_RtoRW[sharers][hop]=hop_hist_RtoRW[sharers][hop]+rds;
+			}
+			else{
+				hop_hist_RO[sharers][hop]=hop_hist_RO[sharers][hop]+rds;
+			}
+			////@@@ repeat for CXL island @@@@@
+			U64 owner_CI=i;
+			auto pp_it_CI = page_owner_CI.find(page);
+			if(pp_it_CI==page_owner_CI.end()){
+				// this will favor thread 0. 
+				// should be ok after the first phase..
+				page_owner_CI[page]=i; 
+				owner_CI=i;
+			}
+			else{
+				owner_CI=pp_it_CI->second;
+			}
+			U64 hop_CI = gethop(i,owner_CI);
+			//U64 sharers_CI = page_sharers[page];
+			hop_hist_W_CI[sharers][hop_CI]=hop_hist_W_CI[sharers][hop_CI]+wrs;
+			if(page_Ws[page]!=0){
+				hop_hist_RtoRW_CI[sharers][hop_CI]=hop_hist_RtoRW_CI[sharers][hop_CI]+rds;
+			}
+			else{
+				hop_hist_RO_CI[sharers][hop_CI]=hop_hist_RO_CI[sharers][hop_CI]+rds;
+			}
+
 		}
 	}	
 
@@ -296,26 +429,55 @@ int process_phase(){
 	}
 
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	// Populate hop histogram
-	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-
-	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// Reassign owners
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	for (const auto& po : page_owner) {
+		U64 page = po.first;
+		U64 sharers = page_sharers[page];
+		if(sharers==0){
+			//no one accssed this page, no owner change
+			continue;
+		}
+		U64 most_acc=0;
+		U64 new_owner=INVAL_OWNER;
+
+		for(U64 i=0; i<pac_size;i++){
+			if(page_access_counts[i][page]>most_acc){
+				most_acc = page_access_counts[i][page];
+				new_owner=i;
+			}
+		}
+		assert(new_owner!=INVAL_OWNER);
+		page_owner[page]=new_owner;
+		page_owner_CI[page]=new_owner;
+		if(sharers>=SHARER_THRESHOLD){
+			page_owner_CI[page]=CXO;
+		}
+	}
 
 
 	U64 total_pages = page_sharers.size();
 	U64 memory_touched = total_pages*PAGESIZE;
 	cout<<"total memory touched in this phase: "<<memory_touched<<endl;
-	// cout<<"total number of accesses in  this phase by t0: "<<total_num_accs[0]<<endl;
-	// U64 sumallacc=0;
-	// for(U64 i=0;i<N_THR;i++){
-	// 	sumallacc+=total_num_accs[i];
-	// }
-	// cout<<"total number of accesses in  this phase by all t: "<<sumallacc<<endl;
+	cout<<"total number of accesses in  this phase by t0: "<<total_num_accs[0]<<endl;
+	U64 sumallacc=0;
+	for(U64 i=0;i<N_THR;i++){
+		sumallacc+=total_num_accs[i];
+	}
+	cout<<"total number of accesses in  this phase by all t: "<<sumallacc<<endl;
 
-	char namebuf[50];
-	//namebuf="myarray\0";
+
+	// stringstream ss;
+	// ss<<"1BPhase"<<curphase;
+	// string dir_name=ss.str();
+	string dir_name = generate_phasedirname();
+	if(mkdir(dir_name.c_str(),0777)==-1){
+		perror(("Error creating directory " + dir_name).c_str());
+    } else {
+            std::cout << "Created directory " << dir_name << std::endl;
+    }
+	
+
 	savearray(hist_access_sharers, N_THR_OFFSET,"access_hist.txt\0");
 	savearray(hist_access_sharers_W, N_THR_OFFSET,"access_hist_W.txt\0");
 	savearray(hist_access_sharers_R_to_RWP, N_THR_OFFSET,"access_hist_R_to_RWP.txt\0");
@@ -325,8 +487,15 @@ int process_phase(){
 	savearray(hist_page_sharers_R, N_THR_OFFSET,"page_hist_R.txt\0");
 	save2Darr(hist_page_shareres_nacc, N_THR_OFFSET, "page_hist_nacc.txt\0");
 
-	U64 nompt=omp_get_num_threads();
-	cout<<"omp threads: "<<nompt<<endl;
+	save_hophist(hop_hist_W,N_THR_OFFSET, "hop_hist_W.txt\0");
+	save_hophist(hop_hist_RO,N_THR_OFFSET, "hop_hist_RO.txt\0");
+	save_hophist(hop_hist_RtoRW,N_THR_OFFSET, "hop_hist_RtoRW.txt\0");
+
+	save_hophist(hop_hist_W_CI,N_THR_OFFSET, "hop_hist_W_CI.txt\0");
+	save_hophist(hop_hist_RO_CI,N_THR_OFFSET, "hop_hist_RO_CI.txt\0");
+	save_hophist(hop_hist_RtoRW_CI,N_THR_OFFSET, "hop_hist_RtoRW_CI.txt\0");
+
+	curphase=curphase+1;
 	return 0;
 }
 
@@ -354,6 +523,10 @@ int main(){
 
 	omp_init_lock(&page_W_lock);
 	omp_init_lock(&page_R_lock);
+	omp_init_lock(&page_owner_lock);
+	omp_init_lock(&page_owner_CI_lock);
+	omp_init_lock(&hop_hist_lock);
+	omp_init_lock(&hop_hist_CI_lock);
 
 	for(int i=0; i<N_THR;i++){
 		std::ostringstream tfname;
@@ -363,7 +536,12 @@ int main(){
 	}
 
 	//return expmain();
-	process_phase();
+	process_phase(); //do a single phase for warmup(page allocation)
+	//while(!any_trace_done){
+	for(int i=0;i<100;i++){ //putting a bound for now
+		if(any_trace_done) break;
+		process_phase();
+	}
 	for(int i=0; i<N_THR;i++){
 		fclose(trace[i]);
 	}

@@ -214,9 +214,9 @@ int process_phase(){
 
 	#pragma omp parallel for
 	for (int i=0; i<N_THR;i++){
-	//for (int i=0; i<1;i++){ // for unit testing
-		//U64 nompt=omp_get_num_threads();
+		U64 nompt=omp_get_num_threads();
 		//cout<<"omp threads: "<<nompt<<endl;
+	//for (int i=0; i<1;i++){ // for unit testing
 		//cout<<"processing thread "<<i<<endl;
 		//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 		// Read Trace and get page access counts
@@ -255,13 +255,10 @@ int process_phase(){
 			U64 rwbit = addr & 1;
 			bool isW = rwbit==1;
 
-			//not doing anything with ins count in this script for now
-			//just read and discard
-			U64 icount_val;
-			read_8B_line(&icount_val, buffer, trace[i]);
 			//dbg during dev. TODO remove
-			//cout<<"page: "<<page<<" icount: "<<icount_val<<endl;
-
+			// cout<<page<<" "<<isW<<endl;
+			// iiii++;
+			// if(iiii==100) return 0;
 
 			// add to page access count
 			auto pa_it = pa_count.find(page);

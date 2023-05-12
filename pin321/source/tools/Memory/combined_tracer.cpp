@@ -58,6 +58,7 @@ bool champsim_trace_done=false;
 //uint64_t tb_i = 0;
 uint64_t t_buf[MAX_THREADS][TBUF_SIZE];
 uint8_t rw_buf[MAX_THREADS][TBUF_SIZE];
+uint64_t timestamp_buf[MAX_THREADS][TBUF_SIZE];
 uint64_t tb_i[MAX_THREADS] = {};
 
 uint64_t numThreads = 0;
@@ -126,7 +127,9 @@ static inline VOID dump_tbuf(THREADID tid) { //TODO add threaID to arg
         //uint64_t lsb_unsetter = ~0xF;
         uint64_t addr_rw = t_buf[tid][i] & ~0xF;
         addr_rw = addr_rw+rw_buf[tid][i];
+        uint64_t timestamp = timestamp_buf[tid][i];
         fwrite(&addr_rw, sizeof(uint64_t), 1,trace[tid]);
+        fwrite(&timestamp, sizeof(uint64_t), 1,trace[tid]);
     }
     tb_i[tid] = 0;
 }
@@ -154,6 +157,7 @@ static inline VOID recordAccess(ADDRINT addr, THREADID tid, CACHE_BASE::ACCESS_T
     num_maccess[tid]++;
     t_buf[tid][tb_i[tid]] = addr;
 	rw_buf[tid][tb_i[tid]] = accessType;
+    timestamp_buf[tid][tb_i[tid]] = ins_count[tid];
     tb_i[tid]++;
     if (tb_i[tid] == TBUF_SIZE) {
         dump_tbuf(tid);

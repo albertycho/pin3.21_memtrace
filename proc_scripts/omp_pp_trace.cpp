@@ -55,33 +55,8 @@ unordered_map<uint64_t, uint64_t> page_owner_CI;
 U64 curphase=0;
 U64 phase_end_cycle=0;
 bool any_trace_done=false;
+std::ofstream misc_log_full("misc_log_full.txt");
 
-int addMap(std::vector<std::unordered_map<uint64_t, uint64_t>>& inunordered_map) {
-    // Create a unordered_map
-    std::unordered_map<uint64_t, uint64_t> new_unordered_map;
-    
-    // Add some data to the unordered_map
-    new_unordered_map[1] = 2;
-	new_unordered_map[5] = 999;
-
-    // Add the unordered_map to the vector
-    inunordered_map.push_back(new_unordered_map);
-
-	return 0;
-}
-int addMap2(){
-    // Create a unordered_map
-    std::unordered_map<uint64_t, uint64_t> new_unordered_map;
-    
-    // Add some data to the unordered_map
-    new_unordered_map[1] = 2;
-	new_unordered_map[5] = 999;
-
-    // Add the unordered_map to the vector
-    page_access_counts_dummy.push_back(new_unordered_map);
-
-	return 0;
-}
 
 int read_8B_line(uint64_t * buf_val, char* buffer, FILE* fptr){
 	size_t readsize = std::fread(buffer, sizeof(char), sizeof(buffer), fptr);
@@ -103,6 +78,42 @@ string generate_full_savefilename(string savefilename){
 	ss<<dir_name<<"/"<<savefilename;
 	string savefilename_full=ss.str();
 	return savefilename_full;
+}
+
+int log_misc_stats(U64 memory_touched_inMB, U64 total_num_accs_0, U64 sumallacc, U64 migrated_pages,
+	U64 migrated_pages_CI, U64 pages_to_CI){
+	cout<<"total memory touched in this phase: "<<(memory_touched_inMB)<<"MB"<<endl;
+	cout<<"total number of accesses in  this phase by t0: "<<total_num_accs_0<<endl;
+	cout<<"total number of accesses in  this phase by all t: "<<sumallacc<<endl;
+	
+	cout<<"Baseline   migrations: "<<migrated_pages<<endl;
+	cout<<"CXLisland  migrations: "<<(migrated_pages_CI+pages_to_CI)<<"("<<migrated_pages_CI<<" not counting pages to CI)"<<endl;
+	cout<<"Migration to CXL_node: "<<pages_to_CI<<endl;	
+
+	misc_log_full<<"total memory touched in this phase: "<<(memory_touched_inMB)<<"MB"<<endl;
+	misc_log_full<<"total number of accesses in  this phase by t0: "<<total_num_accs_0<<endl;
+	misc_log_full<<"total number of accesses in  this phase by all t: "<<sumallacc<<endl;
+	
+	misc_log_full<<"Baseline   migrations: "<<migrated_pages<<endl;
+	misc_log_full<<"CXLisland  migrations: "<<(migrated_pages_CI+pages_to_CI)<<"("<<migrated_pages_CI<<" not counting pages to CI)"<<endl;
+	misc_log_full<<"Migration to CXL_node: "<<pages_to_CI<<endl;
+	
+
+	string phase_misc_log_name=generate_full_savefilename("phase_misc_log.txt");
+	std::ofstream phase_misc_log(phase_misc_log_name);
+	phase_misc_log<<"total memory touched in this phase: "<<(memory_touched_inMB)<<"MB"<<endl;
+	phase_misc_log<<"total number of accesses in  this phase by t0: "<<total_num_accs_0<<endl;
+	phase_misc_log<<"total number of accesses in  this phase by all t: "<<sumallacc<<endl;
+	
+	phase_misc_log<<"Baseline   migrations: "<<migrated_pages<<endl;
+	phase_misc_log<<"CXLisland  migrations: "<<(migrated_pages_CI+pages_to_CI)<<"("<<migrated_pages_CI<<" not counting pages to CI)"<<endl;
+	phase_misc_log<<"Migration to CXL_node: "<<pages_to_CI<<endl;
+
+	phase_misc_log.close();
+
+
+	return 0;
+
 }
 
 int savearray(U64 * arr, U64 arrsize, string savefilename){
@@ -181,6 +192,7 @@ U64 gethop(U64 a, U64 b){
 
 int process_phase(){
 	cout<<"starting phase "<<curphase<<endl;
+	misc_log_full<<"starting phase "<<curphase<<endl;
 	phase_end_cycle=phase_end_cycle+PHASE_CYCLES;
 	//page accesses
 	vector<unordered_map<uint64_t, uint64_t>> page_access_counts;
@@ -192,6 +204,22 @@ int process_phase(){
 	//list of all unique pags and their R/W count
 	unordered_map<uint64_t, uint64_t> page_Rs;
 	unordered_map<uint64_t, uint64_t> page_Ws;
+
+	// list of links (track traffic per link)
+	U64 link_traffic_R[N_THR][N_THR]={0};
+	U64 link_traffic_W[N_THR][N_THR]={0};
+	U64 link_traffic_R_CI[N_THR][N_THR]={0};
+	U64 link_traffic_W_CI[N_THR][N_THR]={0};
+	U64	CI_traffic_R[N_THR]={0};
+	U64	CI_traffic_W[N_THR]={0};
+
+	// traffic at memory controller on each ndoe
+	U64 mem_traffic[N_THR];
+	U64 mem_traffic_CI[N_THR];
+	
+	U64 migrated_pages=0;
+	U64 migrated_pages_CI=0;
+	U64 pages_to_CI=0;
 
 	//Histograms
 	uint64_t hist_access_sharers[N_THR_OFFSET]={0};
@@ -214,10 +242,8 @@ int process_phase(){
 
 	#pragma omp parallel for
 	for (int i=0; i<N_THR;i++){
-	//for (int i=0; i<1;i++){ // for unit testing
 		//U64 nompt=omp_get_num_threads();
 		//cout<<"omp threads: "<<nompt<<endl;
-		//cout<<"processing thread "<<i<<endl;
 		//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 		// Read Trace and get page access counts
 		//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -236,8 +262,6 @@ int process_phase(){
 		while(readsize==8){
 			if(buf_val==0xc0ffee){ // 1B inst phase done
 				read_8B_line(&buf_val, buffer, trace[i]);
-				//cout<<"inst count: "<<buf_val<<endl;
-				//TODO - check(assertion) if end of phase inst  count checks out
 				if(buf_val>=phase_end_cycle){
 					//cout<<"inst count: "<<buf_val<<endl;
 					break;
@@ -343,9 +367,7 @@ int process_phase(){
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	U64 pac_size = page_access_counts.size();
 	assert(pac_size==N_THR);
-	//for (const auto& pa_c : page_access_counts) {
 	for(U64 i=0; i<pac_size;i++){
-		//unordered_map<uint64_t, uint64_t> pa_c = page_access_counts[i];
 		auto pac   = page_access_counts[i];
 		auto pac_W = page_access_counts_W[i];
 		auto pac_R = page_access_counts_R[i];
@@ -388,6 +410,10 @@ int process_phase(){
 			else{
 				hop_hist_RO[sharers][hop]=hop_hist_RO[sharers][hop]+rds;
 			}
+			link_traffic_R[i][owner]=link_traffic_R[i][owner]+rds;
+			link_traffic_W[i][owner]=link_traffic_W[i][owner]+wrs;
+			mem_traffic[i]=mem_traffic[i]+rds+wrs;
+			
 			////@@@ repeat for CXL island @@@@@
 			U64 owner_CI=i;
 			auto pp_it_CI = page_owner_CI.find(page);
@@ -408,6 +434,16 @@ int process_phase(){
 			}
 			else{
 				hop_hist_RO_CI[sharers][hop_CI]=hop_hist_RO_CI[sharers][hop_CI]+rds;
+			}
+			if(owner_CI==CXO){
+				CI_traffic_R[i]=CI_traffic_R[i]+rds;
+				CI_traffic_W[i]=CI_traffic_W[i]+wrs;
+				
+			}
+			else{
+				link_traffic_R_CI[i][owner]=link_traffic_R_CI[i][owner]+rds;
+				link_traffic_W_CI[i][owner]=link_traffic_W_CI[i][owner]+wrs;
+				mem_traffic_CI[i]=mem_traffic_CI[i]+rds+wrs;
 			}
 
 		}
@@ -453,28 +489,28 @@ int process_phase(){
 			}
 		}
 		assert(new_owner!=INVAL_OWNER);
+		if(page_owner.find(page)!=page_owner.end()){
+			if(page_owner[page]!=new_owner){
+				migrated_pages++;			
+			}
+		}
 		page_owner[page]=new_owner;
-		page_owner_CI[page]=new_owner;
+		//page_owner_CI[page]=new_owner;
 		if(sharers>=SHARER_THRESHOLD){
+			if(page_owner_CI[page]!=CXO){
+				pages_to_CI++;
+			}
 			page_owner_CI[page]=CXO;
+		}
+		else{
+			if(page_owner_CI[page]!=new_owner){
+				migrated_pages_CI++;
+			}
+			page_owner_CI[page]=new_owner;
 		}
 	}
 
-
-	U64 total_pages = page_sharers.size();
-	U64 memory_touched = total_pages*PAGESIZE;
-	cout<<"total memory touched in this phase: "<<memory_touched<<endl;
-	cout<<"total number of accesses in  this phase by t0: "<<total_num_accs[0]<<endl;
-	U64 sumallacc=0;
-	for(U64 i=0;i<N_THR;i++){
-		sumallacc+=total_num_accs[i];
-	}
-	cout<<"total number of accesses in  this phase by all t: "<<sumallacc<<endl;
-
-
-	// stringstream ss;
-	// ss<<"1BPhase"<<curphase;
-	// string dir_name=ss.str();
+	// Record Stat Data from this phase
 	string dir_name = generate_phasedirname();
 	if(mkdir(dir_name.c_str(),0777)==-1){
 		perror(("Error creating directory " + dir_name).c_str());
@@ -482,6 +518,28 @@ int process_phase(){
             std::cout << "Created directory " << dir_name << std::endl;
     }
 	
+	U64 total_pages = page_sharers.size();
+	U64 memory_touched = total_pages*PAGESIZE;
+	U64 memory_touched_inMB = memory_touched>>20;
+	U64 sumallacc=0;
+	for(U64 i=0;i<N_THR;i++){
+		sumallacc+=total_num_accs[i];
+	}
+
+
+	log_misc_stats(memory_touched_inMB,total_num_accs[0]
+	,sumallacc,migrated_pages,migrated_pages_CI,pages_to_CI);
+
+	cout<<"baseline"<<endl;
+	cout<<"memtraffic on node 5: "<<mem_traffic[5]<<endl;
+	U64 linktraffic_5_12=link_traffic_R[5][12]+link_traffic_R[12][5]+link_traffic_W[5][12]+link_traffic_W[12][5];
+	cout<<"link traffic between 5 and 12: "<< linktraffic_5_12<<endl;
+	
+	cout<<"CXL Island"<<endl;
+	cout<<"memtraffic on node 5: "<<mem_traffic_CI[5]<<endl;
+	U64 linktraffic_5_12_CI=link_traffic_R_CI[5][12]+link_traffic_R_CI[12][5]+link_traffic_W_CI[5][12]+link_traffic_W_CI[12][5];
+	cout<<"link traffic between 5 and 12: "<< linktraffic_5_12_CI<<endl;
+	cout<<"traffic to CI from a single node(5): "<<CI_traffic_R[5]+CI_traffic_W[5]<<endl;
 
 	savearray(hist_access_sharers, N_THR_OFFSET,"access_hist.txt\0");
 	savearray(hist_access_sharers_W, N_THR_OFFSET,"access_hist_W.txt\0");
@@ -500,29 +558,10 @@ int process_phase(){
 	save_hophist(hop_hist_RO_CI,N_THR_OFFSET, "hop_hist_RO_CI.txt\0");
 	save_hophist(hop_hist_RtoRW_CI,N_THR_OFFSET, "hop_hist_RtoRW_CI.txt\0");
 
+	
 	curphase=curphase+1;
 	return 0;
 }
-
-int expmain(){
-//int main(){
-	cout<<"calling addunordered_map"<<endl;
-	//addMap(page_access_counts);
-	addMap2();
-	cout<<"size of page_access_counts: "<<page_access_counts_dummy.size()<<endl;
-
-	int i=0;
-    for(const auto &unordered_map : page_access_counts_dummy) {
-		cout<<"unordered_map"<<i<<endl;
-		i++;
-        for(const auto &pair : unordered_map) {
-            std::cout << "Key: " << pair.first << ", Value: " << pair.second << std::endl;
-        }
-    }
-
-	return 0;
-}
-
 
 int main(){
 
@@ -540,13 +579,13 @@ int main(){
     	trace[i] = fopen(tfname.str().c_str(), "rb");
 	}
 
-	//return expmain();
 	process_phase(); //do a single phase for warmup(page allocation)
 	//while(!any_trace_done){
 	for(int i=0;i<100;i++){ //putting a bound for now
 		if(any_trace_done) break;
 		process_phase();
 	}
+	cout<<"processed "<<curphase<<" phases"<<endl;
 	for(int i=0; i<N_THR;i++){
 		fclose(trace[i]);
 	}

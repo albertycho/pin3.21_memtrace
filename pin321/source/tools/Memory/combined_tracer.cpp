@@ -204,10 +204,12 @@ BOOL ShouldWrite(THREADID tid)
   if(tid!=champsim_trace_tid){
         return false;
   }
+  //std::cout<<"shouldWrite gets here1"<<std::endl;
   if(!(inROI[champsim_trace_tid] || inROI_master)){
     return false;
   }
   if(ins_count[champsim_trace_tid] > champsim_tracedoneins){
+  //std::cout<<"shouldWrite: inscount: "<<ins_count[champsim_trace_tid]<<std::endl;
     if(!champsim_trace_done){
 	  champsim_outfile.close();
       champsim_trace_done=true;
@@ -215,6 +217,7 @@ BOOL ShouldWrite(THREADID tid)
     return false;
 	  //exit(0);
   }
+  //std::cout<<"shouldWrite gets here2"<<std::endl;
   return (ins_count[champsim_trace_tid] > champsim_skipins);
   //return (instrCount > KnobSkipInstructions.Value()) && (instrCount <= (KnobTraceInstructions.Value()+KnobSkipInstructions.Value()));
 }
@@ -395,7 +398,7 @@ static VOID pin_magic_inst(THREADID tid, ADDRINT value, ADDRINT field){
 
 static VOID Instruction(INS ins, VOID* v)
 {
-    THREADID curtid = PIN_ThreadId();
+    //THREADID curtid = PIN_ThreadId();
     // all instruction fetches access I-cache
     INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)InsRef, IARG_INST_PTR, IARG_THREAD_ID, IARG_END);
 
@@ -408,7 +411,7 @@ static VOID Instruction(INS ins, VOID* v)
     }
 
     //getting champsim trace for just 1 thread
-    if(curtid==champsim_trace_tid){
+    //if(curtid==champsim_trace_tid){
         INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)ResetCurrentInstruction, IARG_INST_PTR, IARG_THREAD_ID, IARG_END);
         if(INS_IsBranch(ins))
             INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BranchOrNot, IARG_BRANCH_TAKEN, IARG_THREAD_ID, IARG_END);
@@ -452,7 +455,7 @@ static VOID Instruction(INS ins, VOID* v)
         // finalize each instruction with this function
         INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)ShouldWrite,IARG_THREAD_ID, IARG_END);
         INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteCurrentInstruction,IARG_THREAD_ID, IARG_END);
-    }
+    //}
 
     if (!INS_IsStandardMemop(ins)) return;
     if (INS_MemoryOperandCount(ins) == 0) return;

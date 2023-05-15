@@ -204,7 +204,7 @@ BOOL ShouldWrite(THREADID tid)
   if(tid!=champsim_trace_tid){
         return false;
   }
-  if(!inROI[champsim_trace_tid]){
+  if(!(inROI[champsim_trace_tid] || inROI_master)){
     return false;
   }
   if(ins_count[champsim_trace_tid] > champsim_tracedoneins){

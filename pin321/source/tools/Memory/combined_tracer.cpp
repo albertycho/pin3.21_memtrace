@@ -25,7 +25,7 @@ using trace_instr_format_t = input_instr;
 
 
 trace_instr_format_t curr_instr;
-THREADID champsim_trace_tid = 1; // thr 16 should be a thread of interest for us, for most apps
+THREADID champsim_trace_tid = 15; // thr 16 should be a thread of interest for us, for most apps
 
 std::ofstream champsim_outfile;
 
@@ -536,6 +536,7 @@ extern int main(int argc, char* argv[])
     champsim_skipins  = KnobSkipInstructions.Value();
     champsim_traceins = KnobTraceInstructions.Value();
     champsim_tracedoneins = champsim_skipins+champsim_traceins;
+    std::cout<<"champsim skipins "<<champsim_skipins<<", champsim traceins: "<<champsim_traceins<<", champsim_tracedoneins: "<<champsim_tracedoneins<<std::endl;
 
     champsim_outfile.open("champsim.trace", std::ios_base::binary | std::ios_base::trunc);
     if (!champsim_outfile)

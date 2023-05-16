@@ -334,6 +334,8 @@ int process_phase(){
 			page_access_counts.push_back(pa_count);
 			page_access_counts_W.push_back(pa_count_W);
 			page_access_counts_R.push_back(pa_count_R);
+			misc_log_full<<"t_"<<i<<" accesses this phase: "<<tmp_numacc<<endl;
+			
 		}
 		for (const auto& pw : page_Ws_tmp) {
 			U64 page = pw.first;

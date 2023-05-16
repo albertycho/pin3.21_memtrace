@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import pickle
 
 
-lats=[80,130,300,200]
+lats=[80,130,350,200]
 
 def transpose(TDL):
     x=len(TDL)

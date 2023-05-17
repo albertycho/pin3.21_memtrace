@@ -214,8 +214,8 @@ int process_phase(){
 	U64	CI_traffic_W[N_THR]={0};
 
 	// traffic at memory controller on each ndoe
-	U64 mem_traffic[N_THR];
-	U64 mem_traffic_CI[N_THR];
+	U64 mem_traffic[N_THR]={0};
+	U64 mem_traffic_CI[N_THR]={0};
 	
 	U64 migrated_pages=0;
 	U64 migrated_pages_CI=0;

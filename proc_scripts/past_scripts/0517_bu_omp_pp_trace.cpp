@@ -34,7 +34,7 @@
 // #define PHASE_CYCLES 1000000000
 
 #define LIMIT_MIGRATION 1
-#define MIGRATION_LIMIT 32768
+#define MIGRATION_LIMIT 8192
 
 using namespace std;
 
@@ -157,6 +157,7 @@ int process_phase(){
 			//just read and discard
 			U64 icount_val;
 			read_8B_line(&icount_val, buffer, trace[i]);
+			//dbg during dev. TODO remove
 			//cout<<"page: "<<page<<" icount: "<<icount_val<<endl;
 
 
@@ -240,17 +241,48 @@ int process_phase(){
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// sort pages in order of accesses in sorted_candidates
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	//cout<<"page_Rs size: "<<page_Rs.size()<<endl;
+	U64 max_acc_page = 0;
+	U64 max_accs = 0;
+	cout<<"page_Rs size: "<<page_Rs.size()<<endl;
+	int jjj=0;
 	for (const auto& ppair : page_Rs){
+		jjj++;
 		U64 page = ppair.first;
 		U64 accs = ppair.second + page_Ws[page];
 		//TODO can probably skip pages that have low accs, like < 100
 		if(accs>100){
-			sorted_candidates.insert({page, accs});
+			auto inserted = sorted_candidates.insert({page, accs});
+			// if(!inserted.second){
+			// 	cout<<"not inserted, "<<inserted.first->first<<","<<inserted.first->second<<endl;
+			// 	cout<<"page: "<<page<<", access count: "<<accs<<endl;
+			// }
+			///dbg
+			if(accs>max_accs){
+				max_accs=accs;
+				max_acc_page=page;
+			}
 		}
 	}
-	//cout<<"sorted candidates size: "<<sorted_candidates.size()<<endl;
-
+	cout<<"sorted candidates size: "<<sorted_candidates.size()<<", jjj: "<<jjj<<endl;
+	auto tmpit=sorted_candidates.begin();
+	
+	std::cout<<"max_acc_page: "<<max_acc_page<<", max_accs: "<<max_accs<<endl;
+	std::cout<<"sorted_candidates[0]: "<<sorted_candidates.begin()->first<<", accs: "<<sorted_candidates.begin()->second<<endl;
+	std::cout<<"sorted_candidates[0]: "<<tmpit->first<<", accs: "<<tmpit->second<<endl;
+	tmpit++;
+	std::cout<<"second sorted_candidates[1]: "<<tmpit->first<<", accs: "<<tmpit->second<<endl;
+	//more sancheck.. TODO remove
+	auto it_migration = sorted_candidates.begin();
+	cout<<"printing sorted_candidates"<<endl;
+	std::set<uint64_t> sanchecker;
+	while (it_migration!=sorted_candidates.end()){
+		cout<<"page: "<<it_migration->first<<", count: "<<it_migration->second<<endl;
+		auto tmpbool = sanchecker.insert(it_migration->first);
+		if(!tmpbool.second){
+			cout<<"duplicate page in sorted_candidates"<<endl;
+		}
+		it_migration++;
+	}
 
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// Populate access sharer histogram

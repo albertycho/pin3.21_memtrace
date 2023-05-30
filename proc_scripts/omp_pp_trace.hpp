@@ -137,6 +137,19 @@ int save2Darr(U64 arr[][N_THR_OFFSET], U64 arrsize, string savefilename){
 	return 0;
 }
 
+int save_uo_map(const std::unordered_map<uint64_t, uint64_t> smap, const string savefilename){
+	string savefilename_full=generate_full_savefilename(savefilename);
+	std::ofstream file(savefilename_full);
+	
+	for (const auto& pair : smap) {
+        file << pair.first << ' ' << pair.second << '\n';
+    }
+
+	file.close();
+	return 0;
+	
+}
+
 int save_hophist(U64 arr[][4], U64 arrsize, string savefilename){
 	//std::ofstream file(savefilename);
 	string savefilename_full=generate_full_savefilename(savefilename);

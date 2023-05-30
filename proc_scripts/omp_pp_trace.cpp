@@ -61,6 +61,9 @@ U64 phase_end_cycle=0;
 bool any_trace_done=false;
 std::ofstream misc_log_full("misc_log_full.txt");
 
+uint64_t skipinsts=5000000000;
+uint64_t phase_to_dump_pagemapping=0;
+uint64_t num_phases_to_dump_pagemapping=2;
 
 int process_phase(){
 	cout<<"starting phase "<<curphase<<endl;
@@ -468,7 +471,7 @@ int process_phase(){
 	if(mkdir(dir_name.c_str(),0777)==-1){
 		perror(("Error creating directory " + dir_name).c_str());
     } else {
-            std::cout << "Created directory " << dir_name << std::endl;
+        std::cout << "Created directory " << dir_name << std::endl;
     }
 	
 	U64 total_pages = page_sharers.size();
@@ -511,6 +514,11 @@ int process_phase(){
 	save_hophist(hop_hist_RO_CI,N_THR_OFFSET, "hop_hist_RO_CI.txt\0");
 	save_hophist(hop_hist_RtoRW_CI,N_THR_OFFSET, "hop_hist_RtoRW_CI.txt\0");
 
+	if(curphase>=phase_to_dump_pagemapping && curphase<(phase_to_dump_pagemapping+num_phases_to_dump_pagemapping)){
+		save_uo_map(page_owner,"page_owner.txt\0");
+		save_uo_map(page_owner_CI,"page_owner_CI.txt\0");
+	}
+
 	
 	curphase=curphase+1;
 	return 0;
@@ -525,6 +533,12 @@ int main(){
 	omp_init_lock(&hop_hist_lock);
 	omp_init_lock(&hop_hist_CI_lock);
 	curphase=0;
+	
+	phase_to_dump_pagemapping=(skipinsts/PHASE_CYCLES)-1; 
+	//for initial check
+	//phase_to_dump_pagemapping=1;
+	assert(phase_to_dump_pagemapping>=0);
+	//-1 because mapping is deteremined at the end of previus phase
 
 	for(int i=0; i<N_THR;i++){
 		std::ostringstream tfname;

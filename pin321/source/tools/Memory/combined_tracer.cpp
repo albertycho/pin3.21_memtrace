@@ -267,6 +267,7 @@ void WriteToSet(T* begin, T* end, UINT32 r, THREADID tid)
   auto found_reg = std::find(begin, set_end, r); // check to see if this register is already in the list
   *found_reg = r;
 }
+int dummy1=0;
 template <typename T>
 void WriteToSet_mem(T* begin, T* end, UINT64 r, THREADID tid)
 {
@@ -278,8 +279,11 @@ void WriteToSet_mem(T* begin, T* end, UINT64 r, THREADID tid)
         return;
     }
     ///dbg
+    if(dummy<10){
+        dummy++;
     std::cout<<"r     : "<<std::hex<<r<<std::endl;
     std::cout<<"r_page: "<<std::hex<<(r>>12)<<std::endl;
+    }
   auto set_end = std::find(begin, end, 0);
   auto found_reg = std::find(begin, set_end, r); // check to see if this register is already in the list
   *found_reg = r;

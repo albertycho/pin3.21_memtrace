@@ -267,6 +267,23 @@ void WriteToSet(T* begin, T* end, UINT32 r, THREADID tid)
   auto found_reg = std::find(begin, set_end, r); // check to see if this register is already in the list
   *found_reg = r;
 }
+template <typename T>
+void WriteToSet_mem(T* begin, T* end, UINT32 r, THREADID tid)
+{
+    if(tid!=champsim_trace_tid){
+        return;
+    }
+    if(champsim_trace_done){ return;}
+    if(ins_count[champsim_trace_tid] < champsim_skipins){
+        return;
+    }
+    ///dbg
+    cout<<"r     : "<<std::hex<<r<<std::endl;
+    cout<<"r_page: "<<std::hex<<(r>>12)<<std::endl;
+  auto set_end = std::find(begin, end, 0);
+  auto found_reg = std::find(begin, set_end, r); // check to see if this register is already in the list
+  *found_reg = r;
+}
 void ResetCurrentInstruction(VOID *ip, THREADID tid)
 {
     if(tid!=champsim_trace_tid){
@@ -443,11 +460,11 @@ static VOID Instruction(INS ins, VOID* v)
         for (UINT32 memOp = 0; memOp < memOperands; memOp++) 
         {
             if (INS_MemoryOperandIsRead(ins, memOp)) 
-                INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet<unsigned long long int>,
+                INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet_mem<unsigned long long int>,
                     IARG_PTR, curr_instr.source_memory, IARG_PTR, curr_instr.source_memory + NUM_INSTR_SOURCES,
                     IARG_MEMORYOP_EA, memOp, IARG_THREAD_ID, IARG_END);
             if (INS_MemoryOperandIsWritten(ins, memOp)) 
-                INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet<unsigned long long int>,
+                INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet_mem<unsigned long long int>,
                     IARG_PTR, curr_instr.destination_memory, IARG_PTR, curr_instr.destination_memory + NUM_INSTR_DESTINATIONS,
                     IARG_MEMORYOP_EA, memOp, IARG_THREAD_ID, IARG_END);
         }

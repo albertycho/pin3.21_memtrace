@@ -140,6 +140,10 @@ int save2Darr(U64 arr[][N_THR_OFFSET], U64 arrsize, string savefilename){
 int save_uo_map(const std::unordered_map<uint64_t, uint64_t> smap, const string savefilename){
 	string savefilename_full=generate_full_savefilename(savefilename);
 	std::ofstream file(savefilename_full);
+	if (!file.is_open()) {
+    	std::cerr << "Failed to open file: " << savefilename_full << std::endl;
+    	return -1;
+  	}
 	
 	for (const auto& pair : smap) {
         file << pair.first << ' ' << pair.second << '\n';

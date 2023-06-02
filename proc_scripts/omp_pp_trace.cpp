@@ -362,6 +362,21 @@ int process_phase(){
 		hist_page_shareres_nacc[log_ac][sharers]=hist_page_shareres_nacc[log_ac][sharers]+1;
 	}
 
+	//save vpage to owner mapping, before reassigning for next phase
+	// Record Stat Data from this phase
+	string dir_name = generate_phasedirname();
+	if(mkdir(dir_name.c_str(),0777)==-1){
+		perror(("Error creating directory " + dir_name).c_str());
+    } else {
+        std::cout << "Created directory " << dir_name << std::endl;
+    }
+
+	if(curphase>=phase_to_dump_pagemapping && curphase<(phase_to_dump_pagemapping+num_phases_to_dump_pagemapping)){
+		cout<<"dumping page to socket mapping"<<std::endl;
+		save_uo_map(page_owner,"page_owner.txt\0");
+		save_uo_map(page_owner_CI,"page_owner_CI.txt\0");
+	}
+	
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// Reassign owners
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -466,13 +481,7 @@ int process_phase(){
 		}
 	}
 
-	// Record Stat Data from this phase
-	string dir_name = generate_phasedirname();
-	if(mkdir(dir_name.c_str(),0777)==-1){
-		perror(("Error creating directory " + dir_name).c_str());
-    } else {
-        std::cout << "Created directory " << dir_name << std::endl;
-    }
+
 	
 	U64 total_pages = page_sharers.size();
 	U64 memory_touched = total_pages*PAGESIZE;
@@ -514,11 +523,6 @@ int process_phase(){
 	save_hophist(hop_hist_RO_CI,N_THR_OFFSET, "hop_hist_RO_CI.txt\0");
 	save_hophist(hop_hist_RtoRW_CI,N_THR_OFFSET, "hop_hist_RtoRW_CI.txt\0");
 
-	if(curphase>=phase_to_dump_pagemapping && curphase<(phase_to_dump_pagemapping+num_phases_to_dump_pagemapping)){
-		save_uo_map(page_owner,"page_owner.txt\0");
-		save_uo_map(page_owner_CI,"page_owner_CI.txt\0");
-	}
-
 	
 	curphase=curphase+1;
 	return 0;
@@ -534,10 +538,11 @@ int main(){
 	omp_init_lock(&hop_hist_CI_lock);
 	curphase=0;
 	
-	phase_to_dump_pagemapping=(skipinsts/PHASE_CYCLES)-1; 
+	phase_to_dump_pagemapping=(skipinsts/PHASE_CYCLES); 
 	//for initial check
 	//phase_to_dump_pagemapping=1;
 	assert(phase_to_dump_pagemapping>=0);
+	cout<<"phase to dump pagemapping "<<phase_to_dump_pagemapping<<std::endl;
 	//-1 because mapping is deteremined at the end of previus phase
 
 	for(int i=0; i<N_THR;i++){

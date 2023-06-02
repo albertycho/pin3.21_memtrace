@@ -279,8 +279,8 @@ void WriteToSet_mem(T* begin, T* end, UINT64 r, THREADID tid)
         return;
     }
     ///dbg
-    if(dummy<10){
-        dummy++;
+    if(dummy1<10){
+        dummy1++;
     std::cout<<"r     : "<<std::hex<<r<<std::endl;
     std::cout<<"r_page: "<<std::hex<<(r>>12)<<std::endl;
     }

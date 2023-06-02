@@ -278,8 +278,8 @@ void WriteToSet_mem(T* begin, T* end, UINT32 r, THREADID tid)
         return;
     }
     ///dbg
-    cout<<"r     : "<<std::hex<<r<<std::endl;
-    cout<<"r_page: "<<std::hex<<(r>>12)<<std::endl;
+    std::cout<<"r     : "<<std::hex<<r<<std::endl;
+    std::cout<<"r_page: "<<std::hex<<(r>>12)<<std::endl;
   auto set_end = std::find(begin, end, 0);
   auto found_reg = std::find(begin, set_end, r); // check to see if this register is already in the list
   *found_reg = r;

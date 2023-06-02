@@ -268,7 +268,7 @@ void WriteToSet(T* begin, T* end, UINT32 r, THREADID tid)
   *found_reg = r;
 }
 template <typename T>
-void WriteToSet_mem(T* begin, T* end, UINT32 r, THREADID tid)
+void WriteToSet_mem(T* begin, T* end, UINT64 r, THREADID tid)
 {
     if(tid!=champsim_trace_tid){
         return;

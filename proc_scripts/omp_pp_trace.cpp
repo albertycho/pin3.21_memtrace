@@ -63,7 +63,7 @@ std::ofstream misc_log_full("misc_log_full.txt");
 
 uint64_t skipinsts=5000000000;
 uint64_t phase_to_dump_pagemapping=0;
-uint64_t num_phases_to_dump_pagemapping=2;
+uint64_t num_phases_to_dump_pagemapping=20;
 
 int process_phase(){
 	cout<<"starting phase "<<curphase<<endl;

@@ -481,7 +481,6 @@ int process_phase(){
 		}
 	}
 
-
 	
 	U64 total_pages = page_sharers.size();
 	U64 memory_touched = total_pages*PAGESIZE;
@@ -490,10 +489,14 @@ int process_phase(){
 	for(U64 i=0;i<N_THR;i++){
 		sumallacc+=total_num_accs[i];
 	}
+	/// find all pages whose owner is CXI, to get memory size on CXI
+	uint64_t CXI_count = std::count_if(page_owner_CI.begin(), page_owner_CI.end(), [](const std::pair<uint64_t, uint64_t>& pair) {
+        return pair.second == CXO;
+    });
 
 
 	log_misc_stats(memory_touched_inMB,total_num_accs[0]
-	,sumallacc,migrated_pages,migrated_pages_CI,pages_to_CI,misc_log_full);
+	,sumallacc,migrated_pages,migrated_pages_CI,pages_to_CI, CXI_count, misc_log_full);
 
 	cout<<"baseline"<<endl;
 	cout<<"memtraffic on node 5: "<<mem_traffic[5]<<endl;

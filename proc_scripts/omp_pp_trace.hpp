@@ -65,7 +65,7 @@ string generate_full_savefilename(string savefilename){
 }
 
 int log_misc_stats(U64 memory_touched_inMB, U64 total_num_accs_0, U64 sumallacc, U64 migrated_pages,
-	U64 migrated_pages_CI, U64 pages_to_CI, ofstream& misc_log_full){
+	U64 migrated_pages_CI, U64 pages_to_CI, U64 CXI_count, ofstream& misc_log_full){
 	cout<<"total memory touched in this phase: "<<(memory_touched_inMB)<<"MB"<<endl;
 	cout<<"total number of accesses in  this phase by t0: "<<total_num_accs_0<<endl;
 	cout<<"total number of accesses in  this phase by all t: "<<sumallacc<<endl;
@@ -73,6 +73,8 @@ int log_misc_stats(U64 memory_touched_inMB, U64 total_num_accs_0, U64 sumallacc,
 	cout<<"Baseline   migrations: "<<migrated_pages<<endl;
 	cout<<"CXLisland  migrations: "<<(migrated_pages_CI+pages_to_CI)<<"("<<migrated_pages_CI<<" not counting pages to CI)"<<endl;
 	cout<<"Migration to CXL_node: "<<pages_to_CI<<endl;	
+	cout<<"Number of pages in CXL_node: "<<CXI_count<<endl;
+	cout<<"size of data on CXL_node: "<<((CXI_count*4096)/1000000)<<"MB"<<endl;
 
 	misc_log_full<<"total memory touched in this phase: "<<(memory_touched_inMB)<<"MB"<<endl;
 	misc_log_full<<"total number of accesses in  this phase by t0: "<<total_num_accs_0<<endl;
@@ -81,7 +83,8 @@ int log_misc_stats(U64 memory_touched_inMB, U64 total_num_accs_0, U64 sumallacc,
 	misc_log_full<<"Baseline   migrations: "<<migrated_pages<<endl;
 	misc_log_full<<"CXLisland  migrations: "<<(migrated_pages_CI+pages_to_CI)<<"("<<migrated_pages_CI<<" not counting pages to CI)"<<endl;
 	misc_log_full<<"Migration to CXL_node: "<<pages_to_CI<<endl;
-	
+	misc_log_full<<"Number of pages in CXL_node: "<<CXI_count<<endl;
+	misc_log_full<<"size of data on CXL_node: "<<((CXI_count*4096)/1000000)<<"MB"<<endl;
 
 	string phase_misc_log_name=generate_full_savefilename("phase_misc_log.txt");
 	std::ofstream phase_misc_log(phase_misc_log_name);
@@ -92,6 +95,8 @@ int log_misc_stats(U64 memory_touched_inMB, U64 total_num_accs_0, U64 sumallacc,
 	phase_misc_log<<"Baseline   migrations: "<<migrated_pages<<endl;
 	phase_misc_log<<"CXLisland  migrations: "<<(migrated_pages_CI+pages_to_CI)<<"("<<migrated_pages_CI<<" not counting pages to CI)"<<endl;
 	phase_misc_log<<"Migration to CXL_node: "<<pages_to_CI<<endl;
+	phase_misc_log<<"Number of pages in CXL_node: "<<CXI_count<<endl;
+	phase_misc_log<<"size of data on CXL_node: "<<((CXI_count*4096)/1000000)<<"MB"<<endl;
 
 	phase_misc_log.close();
 

@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <limits.h>
 #include <cstdio>
+#include <cstdlib>
 #include <cassert>
 
 #include <cmath>
@@ -55,6 +56,9 @@ vector<unordered_map<uint64_t, uint64_t>> page_access_counts_dummy;
 //unordered_map<uint64_t, uint64_t> page_Ws;
 unordered_map<uint64_t, uint64_t> page_owner;
 unordered_map<uint64_t, uint64_t> page_owner_CI;
+
+unordered_map<uint64_t, uint64_t> migration_per_page;
+unordered_map<uint64_t, uint64_t> migration_per_page_CI;
 
 //U64 curphase=0;
 U64 phase_end_cycle=0;
@@ -287,8 +291,19 @@ int process_phase(){
 			if(pp_it==page_owner.end()){ //new page first touch
 				// this will favor thread 0. 
 				// should be ok after the first phase..
-				page_owner[page]=i; 
-				owner=i;
+				unordered_map<uint64_t, uint64_t> pa_count;
+				vector<uint64_t> sharers = {};
+				uint64_t jj = 0;
+				for (const auto& pa_c : page_access_counts) {
+					if (pa_c.find(page) != pa_c.end()) {
+						sharers.push_back(jj);
+					}
+					jj++;
+				}
+				uint64_t ri = rand() % sharers.size();
+				owner = sharers[ri];
+				page_owner[page]=owner; 
+				
 			}
 			else{
 				owner=pp_it->second;
@@ -403,29 +418,36 @@ int process_phase(){
 				assert(page_owner.find(page)!=page_owner.end()); //remove this after sanity check
 				
 				U64 old_owner = page_owner[page];
-				if(old_owner!=new_owner){
-					//if migrated. if no migration, don't increment
-					i++;
-					migrated_pages++;
-					page_owner[page]=new_owner;
-				}				
+				if (migration_per_page[page] <= (curphase / 4)) {
+					if (old_owner != new_owner) {
+						//if migrated. if no migration, don't increment
+						i++;
+						migrated_pages++;
+						page_owner[page] = new_owner;
+						migration_per_page[page] = migration_per_page[page] + 1;
+					}
+				}
 			}
 			if(i_cxi<MIGRATION_LIMIT){ // cxl-island
 				U64 sharers = page_sharers[page];
 				U64 old_owner = page_owner_CI[page];
-				if(sharers>=SHARER_THRESHOLD){
-					// with replication allowed, would have to check RW ratio and take appropraite step
-					if(page_owner_CI[page]!=CXO){
-						pages_to_CI++;
-						i_cxi++;
-						page_owner_CI[page]=CXO;
+				if (migration_per_page_CI[page] <= (curphase/4)) {
+					if (sharers >= SHARER_THRESHOLD) {
+						// with replication allowed, would have to check RW ratio and take appropraite step
+						if (page_owner_CI[page] != CXO) {
+							pages_to_CI++;
+							i_cxi++;
+							page_owner_CI[page] = CXO;
+							migration_per_page_CI[page] = migration_per_page_CI[page] + 1;
+						}
 					}
-				}
-				else{
-					if(page_owner_CI[page]!=new_owner){
-						migrated_pages_CI++;
-						page_owner_CI[page]=new_owner;
-						i_cxi++;
+					else {
+						if (page_owner_CI[page] != new_owner) {
+							migrated_pages_CI++;
+							page_owner_CI[page] = new_owner;
+							i_cxi++;
+							migration_per_page_CI[page] = migration_per_page_CI[page] + 1;
+						}
 					}
 				}
 				

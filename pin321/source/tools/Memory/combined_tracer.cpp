@@ -29,7 +29,8 @@ using trace_instr_format_t = input_instr;
 trace_instr_format_t curr_instr;
 THREADID champsim_trace_tid = 15; // thr 16 should be a thread of interest for us, for most apps
 
-std::ofstream champsim_outfile;
+std::ofstream dummyofs; //for decltype compiler error suppression
+std::ofstream champsim_outfile[MAX_THREADS];
 
 bool cst_open[MAX_THREADS];
 uint64_t cst_phase[MAX_THREADS] = { 0 };
@@ -212,8 +213,8 @@ void open_champsim_trace(THREADID tid) {
         std::cout << "inscount/PHASE_INTERVAL : " << ins_count[tid] / PHASE_INTERVAL << std::endl;
     }
     ctfname << "champsim_" << tid << "_" << cst_phase[tid] << ".trace";
-    champsim_outfile.open(ctfname.str().c_str(), std::ios_base::binary | std::ios_base::trunc);
-    if (!champsim_outfile)
+    champsim_outfile[tid].open(ctfname.str().c_str(), std::ios_base::binary | std::ios_base::trunc);
+    if (!champsim_outfile[tid])
     {
         std::cout << "Couldn't open output trace file. Exiting." << std::endl;
         exit(1);
@@ -224,8 +225,8 @@ void open_champsim_trace(THREADID tid) {
 }
 
 void close_champsim_trace(THREADID tid) {
-    if (champsim_outfile.is_open()) {
-        champsim_outfile.close();
+    if (champsim_outfile[tid].is_open()) {
+        champsim_outfile[tid].close();
         cst_open[tid] = false;
     }
     else {
@@ -295,9 +296,10 @@ void WriteCurrentInstruction(THREADID tid)
 //   if (ins_count[champsim_trace_tid] < champsim_skipins){
 //     return;
 //   }
-  typename decltype(champsim_outfile)::char_type buf[sizeof(trace_instr_format_t)];
+  //typename decltype(champsim_outfile[tid])::char_type buf[sizeof(trace_instr_format_t)];
+  typename decltype(dummyofs)::char_type buf[sizeof(trace_instr_format_t)];
   std::memcpy(buf, &curr_instr, sizeof(trace_instr_format_t));
-  champsim_outfile.write(buf, sizeof(trace_instr_format_t));
+  champsim_outfile[tid].write(buf, sizeof(trace_instr_format_t));
 }
 void BranchOrNot(UINT32 taken, THREADID tid)
 {
@@ -591,8 +593,8 @@ VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) {
     if (tid == champsim_trace_tid) {
         std::ostringstream ctfname;
         ctfname << "champsim_" << tid << "_" << 0 << ".trace";
-        champsim_outfile.open(ctfname.str().c_str(), std::ios_base::binary | std::ios_base::trunc);
-        if (!champsim_outfile)
+        champsim_outfile[tid].open(ctfname.str().c_str(), std::ios_base::binary | std::ios_base::trunc);
+        if (!champsim_outfile[tid])
         {
             std::cout << "Couldn't open output trace file. Exiting." << std::endl;
             exit(1);

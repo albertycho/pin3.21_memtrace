@@ -23,16 +23,11 @@ typedef UINT32 CACHE_STATS; // type of cache hit/miss counters
 using trace_instr_format_t = input_instr;
 #define MAX_THREADS 64
 
-#define PHASE_INTERVAL 1000000000 //1 Billoion (insts)
-
 
 trace_instr_format_t curr_instr;
 THREADID champsim_trace_tid = 15; // thr 16 should be a thread of interest for us, for most apps
 
 std::ofstream champsim_outfile;
-
-bool cst_open[MAX_THREADS];
-uint64_t cst_phase[MAX_THREADS] = { 0 };
 
 //FILE * trace_sancheck;
 FILE * trace[MAX_THREADS];
@@ -203,37 +198,6 @@ static VOID Ul2Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessT
     }
 }
 
-void open_champsim_trace(THREADID tid) {
-    std::ostringstream ctfname;
-    cst_phase[tid]++;
-    if (cst_phase[tid] != (ins_count[tid] / PHASE_INTERVAL)) {
-        std::cout << "cst_phase does not match is_count/PHASE_INTERVAL" << std::endl;
-        std::cout << "cst_pahse " << tid << " : " << cst_phase[tid] << std::endl;
-        std::cout << "inscount/PHASE_INTERVAL : " << ins_count[tid] / PHASE_INTERVAL << std::endl;
-    }
-    ctfname << "champsim_" << tid << "_" << cst_phase[tid] << ".trace";
-    champsim_outfile.open(ctfname.str().c_str(), std::ios_base::binary | std::ios_base::trunc);
-    if (!champsim_outfile)
-    {
-        std::cout << "Couldn't open output trace file. Exiting." << std::endl;
-        exit(1);
-    }
-    cst_open[tid] = true;
-
-    return;
-}
-
-void close_champsim_trace(THREADID tid) {
-    if (champsim_outfile.is_open()) {
-        champsim_outfile.close();
-        cst_open[tid] = false;
-    }
-    else {
-        std::cout << "champsim outfile " << tid << " was not open in call to close_champsim_trafce" << std::endl;
-    }
-    return;
-}
-
 BOOL ShouldWrite(THREADID tid)
 {//TODO rewrite
 
@@ -241,39 +205,21 @@ BOOL ShouldWrite(THREADID tid)
         return false;
   }
   //std::cout<<"shouldWrite gets here1"<<std::endl;
-  if(!(inROI[tid] || inROI_master)){
+  if(!(inROI[champsim_trace_tid] || inROI_master)){
     return false;
   }
-
-  if ((ins_count[tid] % PHASE_INTERVAL) <= champsim_traceins) { //true, trace on
-      if (cst_open[tid] == false) {
-          ///////// OPEN TRACE
-          open_champsim_trace(tid);
-      }
-      return true;
+  if(ins_count[champsim_trace_tid] > champsim_tracedoneins){
+  //std::cout<<"shouldWrite: inscount: "<<ins_count[champsim_trace_tid]<<std::endl;
+    if(!champsim_trace_done){
+	  champsim_outfile.close();
+      champsim_trace_done=true;
+    }
+    return false;
+	  //exit(0);
   }
-  else {
-      if (cst_open[tid] == true) {
-          //////// CLOSE TRACE
-          close_champsim_trace(tid);
-      }
-      return false;
-  }
-
-
-
-  //if(ins_count[tid] > champsim_tracedoneins){
-  ////std::cout<<"shouldWrite: inscount: "<<ins_count[champsim_trace_tid]<<std::endl;
-  //  if(!champsim_trace_done){
-	 // champsim_outfile.close();
-  //    champsim_trace_done=true;
-  //  }
-  //  return false;
-	 // //exit(0);
-  //}
-  ////std::cout<<"shouldWrite gets here2"<<std::endl;
-  //return (ins_count[tid] > champsim_skipins);
-  ////return (instrCount > KnobSkipInstructions.Value()) && (instrCount <= (KnobTraceInstructions.Value()+KnobSkipInstructions.Value()));
+  //std::cout<<"shouldWrite gets here2"<<std::endl;
+  return (ins_count[champsim_trace_tid] > champsim_skipins);
+  //return (instrCount > KnobSkipInstructions.Value()) && (instrCount <= (KnobTraceInstructions.Value()+KnobSkipInstructions.Value()));
 }
 
 void WriteCurrentInstruction(THREADID tid)
@@ -304,9 +250,6 @@ void BranchOrNot(UINT32 taken, THREADID tid)
     if(tid!=champsim_trace_tid){
         return;
     }
-    if (cst_open[tid] == false) {
-        return;
-    }
     curr_instr.is_branch = 1;
     curr_instr.branch_taken = taken;
 }
@@ -316,7 +259,8 @@ void WriteToSet(T* begin, T* end, UINT32 r, THREADID tid)
     if(tid!=champsim_trace_tid){
         return;
     }
-    if (cst_open[tid] == false) {
+    if(champsim_trace_done){ return;}
+    if(ins_count[champsim_trace_tid] < champsim_skipins){
         return;
     }
   auto set_end = std::find(begin, end, 0);
@@ -330,10 +274,10 @@ void WriteToSet_mem(T* begin, T* end, UINT64 r, THREADID tid)
     if(tid!=champsim_trace_tid){
         return;
     }
-    if (cst_open[tid] == false) {
+    if(champsim_trace_done){ return;}
+    if(ins_count[champsim_trace_tid] < champsim_skipins){
         return;
     }
-
     ///dbg
     if(dummy1<10){
         dummy1++;
@@ -347,9 +291,6 @@ void WriteToSet_mem(T* begin, T* end, UINT64 r, THREADID tid)
 void ResetCurrentInstruction(VOID *ip, THREADID tid)
 {
     if(tid!=champsim_trace_tid){
-        return;
-    }
-    if (cst_open[tid] == false) {
         return;
     }
     curr_instr = {};
@@ -588,17 +529,9 @@ VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) {
     trace[tid] = fopen(tfname.str().c_str(), "wb");
     //trace_sancheck = fopen("asdf.txt", "w");
 
-    if (tid == champsim_trace_tid) {
-        std::ostringstream ctfname;
-        ctfname << "champsim_" << tid << "_" << 0 << ".trace";
-        champsim_outfile.open(ctfname.str().c_str(), std::ios_base::binary | std::ios_base::trunc);
-        if (!champsim_outfile)
-        {
-            std::cout << "Couldn't open output trace file. Exiting." << std::endl;
-            exit(1);
-        }
-        cst_open[tid] = true;
-    }
+    std::ostringstream ins_tfname;
+    ins_tfname << "ins_memtrace_t" << tid << ".out";
+    //ins_trace[tid] = fopen(ins_tfname.str().c_str(), "w");
 
     if(KnobStartFF){
         inROI[tid]=false;
@@ -627,22 +560,14 @@ extern int main(int argc, char* argv[])
     champsim_skipins  = KnobSkipInstructions.Value();
     champsim_traceins = KnobTraceInstructions.Value();
     champsim_tracedoneins = champsim_skipins+champsim_traceins;
-    //std::cout<<"champsim skipins "<<champsim_skipins<<", champsim traceins: "<<champsim_traceins<<", champsim_tracedoneins: "<<champsim_tracedoneins<<std::endl;
-    std::cout << "champsim traceins: " << champsim_traceins << std::endl;
+    std::cout<<"champsim skipins "<<champsim_skipins<<", champsim traceins: "<<champsim_traceins<<", champsim_tracedoneins: "<<champsim_tracedoneins<<std::endl;
 
-    if(KnobTraceInstructions.Value() > PHASE_INTERVAL){
-        std::cout << "Traced insts cannot be larger than PHASE_INTERVAL" << std::endl;
-        std::cout << "PHASE_INTERVAL: " << PHASE_INTERVAL << std::endl;
-        std::cout << "Trace instructions: " << KnobTraceInstructions.Value() << std::endl;
+    champsim_outfile.open("champsim.trace", std::ios_base::binary | std::ios_base::trunc);
+    if (!champsim_outfile)
+    {
+      std::cout << "Couldn't open output trace file. Exiting." << std::endl;
         exit(1);
     }
-
-    //champsim_outfile.open("champsim.trace", std::ios_base::binary | std::ios_base::trunc);
-    //if (!champsim_outfile)
-    //{
-    //  std::cout << "Couldn't open output trace file. Exiting." << std::endl;
-    //    exit(1);
-    //}
 
     //trace = fopen(KnobOutputFile.Value().c_str(), "w");
     INS_AddInstrumentFunction(Instruction, 0);

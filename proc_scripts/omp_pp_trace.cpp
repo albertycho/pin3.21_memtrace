@@ -35,7 +35,7 @@
 // #define PHASE_CYCLES 1000000000
 
 #define LIMIT_MIGRATION 1
-#define MIGRATION_LIMIT 32768
+#define MIGRATION_LIMIT 12288
 
 using namespace std;
 
@@ -386,11 +386,11 @@ int process_phase(){
         std::cout << "Created directory " << dir_name << std::endl;
     }
 
-	if(curphase>=phase_to_dump_pagemapping && curphase<(phase_to_dump_pagemapping+num_phases_to_dump_pagemapping)){
+	//if(curphase>=phase_to_dump_pagemapping && curphase<(phase_to_dump_pagemapping+num_phases_to_dump_pagemapping)){
 		cout<<"dumping page to socket mapping"<<std::endl;
 		save_uo_map(page_owner,"page_owner.txt\0");
 		save_uo_map(page_owner_CI,"page_owner_CI.txt\0");
-	}
+	//}
 	
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// Reassign owners
@@ -579,7 +579,7 @@ int main(){
 
 	process_phase(); //do a single phase for warmup(page allocation)
 	//while(!any_trace_done){
-	for(int i=0;i<100;i++){ //putting a bound for now
+	for(int i=0;i<10000;i++){ //putting a bound for now
 		if(any_trace_done) break;
 		process_phase();
 	}

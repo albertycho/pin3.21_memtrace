@@ -25,7 +25,7 @@ TestApps/simple_array
 .vscode/settings.json
 pin321/source/tools/Memory/obj-intel64/*
 proc_scripts/pp_trace
-proc_scripts/omp_pp_trace
+proc_scripts/omp_pp_trace*
 proc_scripts/.plot_page_hists.py.swp
 *.swp
 */*.swp

@@ -30,7 +30,7 @@
 #define CXO 100 //CXL Island is owner
 #define SHARER_THRESHOLD 8
 #define INVAL_OWNER 9999
-#define PHASE_CYCLES 1000000000
+#define PHASE_CYCLES 10000000
 
 using namespace std;
 
@@ -52,7 +52,7 @@ int read_8B_line(uint64_t * buf_val, char* buffer, FILE* fptr){
 
 string generate_phasedirname(){
 	stringstream ss;
-	ss<<"1BPhase"<<curphase;
+	ss<<"10MPhase"<<curphase;
 	string dir_name=ss.str();
 	return dir_name;
 }

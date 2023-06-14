@@ -165,6 +165,11 @@ int process_phase(){
 			U64 icount_val;
 			read_8B_line(&icount_val, buffer, trace[i]);
 			//cout<<"page: "<<page<<" icount: "<<icount_val<<endl;
+			if(icount_val>=phase_end_cycle){
+				//TODO set flag to break while loop
+				//let's just break... missing one access is fine
+				break;
+			}
 
 
 			// add to page access count

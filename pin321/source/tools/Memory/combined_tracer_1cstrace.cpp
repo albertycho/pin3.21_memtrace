@@ -27,7 +27,8 @@ using trace_instr_format_t = input_instr;
 
 
 trace_instr_format_t curr_instr;
-THREADID champsim_trace_tid = 15; // thr 16 should be a thread of interest for us, for most apps
+//THREADID champsim_trace_tid = 15; // thr 16 should be a thread of interest for us, for most apps
+THREADID champsim_trace_tid = 3; // debugging with less threads
 
 std::ofstream champsim_outfile;
 
@@ -338,7 +339,7 @@ void WriteToSet_mem(T* begin, T* end, UINT64 r, THREADID tid)
     if(dummy1<10){
         dummy1++;
     std::cout<<"r     : "<<std::hex<<r<<std::endl;
-    std::cout<<"r_page: "<<std::hex<<(r>>12)<<std::endl;
+    std::cout<<"r_page: "<<std::hex<<(r>>12)<<std::dec<<std::endl;
     }
   auto set_end = std::find(begin, end, 0);
   auto found_reg = std::find(begin, set_end, r); // check to see if this register is already in the list

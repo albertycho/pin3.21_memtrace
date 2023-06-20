@@ -1,3 +1,5 @@
+// For debug. Multiple champsim_outfile (in array),
+// but still tracing just one champsim trace. one curr_instr variable
 /*
  * Copyright (C) 2004-2021 Intel Corporation.
  * SPDX-License-Identifier: MIT
@@ -26,9 +28,9 @@ using trace_instr_format_t = input_instr;
 #define PHASE_INTERVAL 1000000000 //1 Billoion (insts)
 
 
-trace_instr_format_t curr_instr[MAX_THREADS];
-THREADID champsim_trace_tid_min = 2; // thr 16 should be a thread of interest for us, for most apps
-THREADID champsim_trace_tid_max = 3; 
+trace_instr_format_t curr_instr;
+//THREADID champsim_trace_tid = 15; // thr 16 should be a thread of interest for us, for most apps
+THREADID champsim_trace_tid = 3; // debugging with less threads
 
 std::ofstream dummyofs; //for decltype compiler error suppression
 std::ofstream champsim_outfile[MAX_THREADS];
@@ -236,20 +238,10 @@ void close_champsim_trace(THREADID tid) {
     return;
 }
 
-inline bool is_champsim_trace_tid(THREADID tid){
-    if(tid<champsim_trace_tid_min){
-        return false;
-    }
-    if(tid>champsim_trace_tid_max){
-        return false;
-    }
-    return true;
-}
-
 BOOL ShouldWrite(THREADID tid)
 {//TODO rewrite
 
-  if(!(is_champsim_trace_tid(tid))){
+  if(tid!=champsim_trace_tid){
         return false;
   }
   //std::cout<<"shouldWrite gets here1"<<std::endl;
@@ -290,7 +282,7 @@ BOOL ShouldWrite(THREADID tid)
 
 void WriteCurrentInstruction(THREADID tid)
 {
-    if(!(is_champsim_trace_tid(tid))){
+    if(tid!=champsim_trace_tid){
         return;
     }
 //   if(!inROI[champsim_trace_tid]){
@@ -307,26 +299,26 @@ void WriteCurrentInstruction(THREADID tid)
 //   if (ins_count[champsim_trace_tid] < champsim_skipins){
 //     return;
 //   }
-  //typename decltype(champsim_outfile[tid])::char_type buf[sizeof(trace_instr_format_t)];
+  //typename decltype(champsim_outfile)::char_type buf[sizeof(trace_instr_format_t)];
   typename decltype(dummyofs)::char_type buf[sizeof(trace_instr_format_t)];
-  std::memcpy(buf, &(curr_instr[tid]), sizeof(trace_instr_format_t));
+  std::memcpy(buf, &curr_instr, sizeof(trace_instr_format_t));
   champsim_outfile[tid].write(buf, sizeof(trace_instr_format_t));
 }
 void BranchOrNot(UINT32 taken, THREADID tid)
 {
-    if(!(is_champsim_trace_tid(tid))){
+    if(tid!=champsim_trace_tid){
         return;
     }
     if (cst_open[tid] == false) {
         return;
     }
-    curr_instr[tid].is_branch = 1;
-    curr_instr[tid].branch_taken = taken;
+    curr_instr.is_branch = 1;
+    curr_instr.branch_taken = taken;
 }
 template <typename T>
 void WriteToSet(T* begin, T* end, UINT32 r, THREADID tid)
 {
-    if(!(is_champsim_trace_tid(tid))){
+    if(tid!=champsim_trace_tid){
         return;
     }
     if (cst_open[tid] == false) {
@@ -340,7 +332,7 @@ int dummy1=0;
 template <typename T>
 void WriteToSet_mem(T* begin, T* end, UINT64 r, THREADID tid)
 {
-    if(!(is_champsim_trace_tid(tid))){
+    if(tid!=champsim_trace_tid){
         return;
     }
     if (cst_open[tid] == false) {
@@ -348,25 +340,25 @@ void WriteToSet_mem(T* begin, T* end, UINT64 r, THREADID tid)
     }
 
     ///dbg
-    // if(dummy1<10){
-    //     dummy1++;
-    // std::cout<<"r     : "<<std::hex<<r<<std::endl;
-    // std::cout<<"r_page: "<<std::hex<<(r>>12)<<std::dec<<std::endl;
-    // }
+    if(dummy1<10){
+        dummy1++;
+    std::cout<<"r     : "<<std::hex<<r<<std::endl;
+    std::cout<<"r_page: "<<std::hex<<(r>>12)<<std::dec<<std::endl;
+    }
   auto set_end = std::find(begin, end, 0);
   auto found_reg = std::find(begin, set_end, r); // check to see if this register is already in the list
   *found_reg = r;
 }
 void ResetCurrentInstruction(VOID *ip, THREADID tid)
 {
-    if(!(is_champsim_trace_tid(tid))){
+    if(tid!=champsim_trace_tid){
         return;
     }
     if (cst_open[tid] == false) {
         return;
     }
-    curr_instr[tid] = {};
-    curr_instr[tid].ip = (unsigned long long int)ip;
+    curr_instr = {};
+    curr_instr.ip = (unsigned long long int)ip;
 }
 static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 {
@@ -510,16 +502,12 @@ static VOID Instruction(INS ins, VOID* v)
             INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BranchOrNot, IARG_BRANCH_TAKEN, IARG_THREAD_ID, IARG_END);
 
         // instrument register reads
-        THREADID curtid = PIN_ThreadId();
-        if(curtid>15){
-            std::cout<<"curtid > 15: "<<curtid<<std::endl;
-        }
         UINT32 readRegCount = INS_MaxNumRRegs(ins);
         for(UINT32 i=0; i<readRegCount; i++) 
         {
             UINT32 regNum = INS_RegR(ins, i);
             INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet<unsigned char>,
-                IARG_PTR, curr_instr[curtid].source_registers, IARG_PTR, curr_instr[curtid].source_registers + NUM_INSTR_SOURCES,
+                IARG_PTR, curr_instr.source_registers, IARG_PTR, curr_instr.source_registers + NUM_INSTR_SOURCES,
                 IARG_UINT32, regNum, IARG_THREAD_ID, IARG_END);
         }
 
@@ -529,7 +517,7 @@ static VOID Instruction(INS ins, VOID* v)
         {
             UINT32 regNum = INS_RegW(ins, i);
             INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet<unsigned char>,
-                IARG_PTR, curr_instr[curtid].destination_registers, IARG_PTR, curr_instr[curtid].destination_registers + NUM_INSTR_DESTINATIONS,
+                IARG_PTR, curr_instr.destination_registers, IARG_PTR, curr_instr.destination_registers + NUM_INSTR_DESTINATIONS,
                 IARG_UINT32, regNum, IARG_THREAD_ID, IARG_END);
         }
 
@@ -541,11 +529,11 @@ static VOID Instruction(INS ins, VOID* v)
         {
             if (INS_MemoryOperandIsRead(ins, memOp)) 
                 INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet_mem<unsigned long long int>,
-                    IARG_PTR, curr_instr[curtid].source_memory, IARG_PTR, curr_instr[curtid].source_memory + NUM_INSTR_SOURCES,
+                    IARG_PTR, curr_instr.source_memory, IARG_PTR, curr_instr.source_memory + NUM_INSTR_SOURCES,
                     IARG_MEMORYOP_EA, memOp, IARG_THREAD_ID, IARG_END);
             if (INS_MemoryOperandIsWritten(ins, memOp)) 
                 INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet_mem<unsigned long long int>,
-                    IARG_PTR, curr_instr[curtid].destination_memory, IARG_PTR, curr_instr[curtid].destination_memory + NUM_INSTR_DESTINATIONS,
+                    IARG_PTR, curr_instr.destination_memory, IARG_PTR, curr_instr.destination_memory + NUM_INSTR_DESTINATIONS,
                     IARG_MEMORYOP_EA, memOp, IARG_THREAD_ID, IARG_END);
         }
 
@@ -605,7 +593,7 @@ VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) {
     trace[tid] = fopen(tfname.str().c_str(), "wb");
     //trace_sancheck = fopen("asdf.txt", "w");
 
-    if(is_champsim_trace_tid(tid)){
+    if (tid == champsim_trace_tid) {
         std::ostringstream ctfname;
         ctfname << "champsim_" << tid << "_" << 0 << ".trace";
         champsim_outfile[tid].open(ctfname.str().c_str(), std::ios_base::binary | std::ios_base::trunc);

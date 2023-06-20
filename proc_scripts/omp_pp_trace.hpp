@@ -32,6 +32,9 @@
 #define INVAL_OWNER 9999
 #define PHASE_CYCLES 10000000
 
+#define NBILLION 1000000000
+#define HISTORY_LEN ((uint64_t)(NBILLION/PHASE_CYCLES))
+
 using namespace std;
 
 U64 curphase;
@@ -52,6 +55,7 @@ int read_8B_line(uint64_t * buf_val, char* buffer, FILE* fptr){
 
 string generate_phasedirname(){
 	stringstream ss;
+	//ss<<"1BPhase"<<curphase;
 	ss<<"10MPhase"<<curphase;
 	string dir_name=ss.str();
 	return dir_name;

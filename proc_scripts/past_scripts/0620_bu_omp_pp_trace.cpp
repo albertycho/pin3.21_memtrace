@@ -330,9 +330,9 @@ int process_phase(){
 	// sort pages in order of accesses in sorted_candidates
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	//cout<<"page_Rs size: "<<page_Rs.size()<<endl;
-	for (const auto& ppair : page_Rs_consol){
+	for (const auto& ppair : page_Rs){
 		U64 page = ppair.first;
-		U64 accs = ppair.second + page_Ws_consol[page];
+		U64 accs = ppair.second + page_Ws[page];
 		//TODO can probably skip pages that have low accs, like < 100
 		if(accs>100){
 			sorted_candidates.insert({page, accs});
@@ -491,8 +491,8 @@ int process_phase(){
 			U64 page  = it_migration->first;
 			U64 most_acc=0;
 			U64 new_owner=INVAL_OWNER;
-			for(U64 j=0; j<N_THR;j++){
-				if(page_access_counts_consol[j][page]>most_acc){
+			for(U64 j=0; j<pac_size;j++){
+				if(page_access_counts[j][page]>most_acc){
 					most_acc = page_access_counts[j][page];
 					new_owner=j;
 				}
@@ -513,7 +513,7 @@ int process_phase(){
 				}
 			}
 			if(i_cxi<MIGRATION_LIMIT){ // cxl-island
-				U64 sharers = page_sharers_long[page];
+				U64 sharers = page_sharers[page];
 				U64 old_owner = page_owner_CI[page];
 				if (migration_per_page_CI[page] <= (curphase/4)) {
 					if (sharers >= SHARER_THRESHOLD) {
@@ -550,7 +550,7 @@ int process_phase(){
 	else{
 		for (const auto& po : page_owner) {
 			U64 page = po.first;
-			U64 sharers = page_sharers_long[page];
+			U64 sharers = page_sharers[page];
 			if(sharers==0){
 				//no one accssed this page, no owner change
 				continue;
@@ -559,8 +559,8 @@ int process_phase(){
 			U64 new_owner=INVAL_OWNER;
 
 			for(U64 i=0; i<pac_size;i++){
-				if(page_access_counts_consol[i][page]>most_acc){
-					most_acc = page_access_counts_consol[i][page];
+				if(page_access_counts[i][page]>most_acc){
+					most_acc = page_access_counts[i][page];
 					new_owner=i;
 				}
 			}

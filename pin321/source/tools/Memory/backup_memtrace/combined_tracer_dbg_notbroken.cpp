@@ -1,4 +1,4 @@
-// For debug. Multiple champsim_outfile (in array),
+// For debug. Multiple champsim_outfile (in array): 0624 ver. does not break
 // but still tracing just one champsim trace. one curr_instr variable
 /*
  * Copyright (C) 2004-2021 Intel Corporation.
@@ -29,8 +29,8 @@ using trace_instr_format_t = input_instr;
 
 
 trace_instr_format_t curr_instr;
-THREADID champsim_trace_tid_min = 3; // thr 16 should be a thread of interest for us, for most apps
-THREADID champsim_trace_tid_max = 3; 
+//THREADID champsim_trace_tid = 15; // thr 16 should be a thread of interest for us, for most apps
+THREADID champsim_trace_tid = 3; // debugging with less threads
 
 std::ofstream dummyofs; //for decltype compiler error suppression
 std::ofstream champsim_outfile[MAX_THREADS];
@@ -238,20 +238,10 @@ void close_champsim_trace(THREADID tid) {
     return;
 }
 
-inline bool is_champsim_trace_tid(THREADID tid){
-    if(tid<champsim_trace_tid_min){
-        return false;
-    }
-    if(tid>champsim_trace_tid_max){
-        return false;
-    }
-    return true;
-}
-
 BOOL ShouldWrite(THREADID tid)
 {//TODO rewrite
 
-  if(!(is_champsim_trace_tid(tid))){
+  if(tid!=champsim_trace_tid){
         return false;
   }
   //std::cout<<"shouldWrite gets here1"<<std::endl;
@@ -292,7 +282,7 @@ BOOL ShouldWrite(THREADID tid)
 
 void WriteCurrentInstruction(THREADID tid)
 {
-    if(!(is_champsim_trace_tid(tid))){
+    if(tid!=champsim_trace_tid){
         return;
     }
 //   if(!inROI[champsim_trace_tid]){
@@ -316,7 +306,7 @@ void WriteCurrentInstruction(THREADID tid)
 }
 void BranchOrNot(UINT32 taken, THREADID tid)
 {
-    if(!(is_champsim_trace_tid(tid))){
+    if(tid!=champsim_trace_tid){
         return;
     }
     if (cst_open[tid] == false) {
@@ -328,7 +318,7 @@ void BranchOrNot(UINT32 taken, THREADID tid)
 template <typename T>
 void WriteToSet(T* begin, T* end, UINT32 r, THREADID tid)
 {
-    if(!(is_champsim_trace_tid(tid))){
+    if(tid!=champsim_trace_tid){
         return;
     }
     if (cst_open[tid] == false) {
@@ -342,7 +332,7 @@ int dummy1=0;
 template <typename T>
 void WriteToSet_mem(T* begin, T* end, UINT64 r, THREADID tid)
 {
-    if(!(is_champsim_trace_tid(tid))){
+    if(tid!=champsim_trace_tid){
         return;
     }
     if (cst_open[tid] == false) {
@@ -361,7 +351,7 @@ void WriteToSet_mem(T* begin, T* end, UINT64 r, THREADID tid)
 }
 void ResetCurrentInstruction(VOID *ip, THREADID tid)
 {
-    if(!(is_champsim_trace_tid(tid))){
+    if(tid!=champsim_trace_tid){
         return;
     }
     if (cst_open[tid] == false) {
@@ -603,7 +593,7 @@ VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) {
     trace[tid] = fopen(tfname.str().c_str(), "wb");
     //trace_sancheck = fopen("asdf.txt", "w");
 
-    if(is_champsim_trace_tid(tid)){
+    if (tid == champsim_trace_tid) {
         std::ostringstream ctfname;
         ctfname << "champsim_" << tid << "_" << 0 << ".trace";
         champsim_outfile[tid].open(ctfname.str().c_str(), std::ios_base::binary | std::ios_base::trunc);

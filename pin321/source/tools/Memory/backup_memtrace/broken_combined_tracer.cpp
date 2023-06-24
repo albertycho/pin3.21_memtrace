@@ -1,5 +1,3 @@
-// For debug. Multiple champsim_outfile (in array),
-// but still tracing just one champsim trace. one curr_instr variable
 /*
  * Copyright (C) 2004-2021 Intel Corporation.
  * SPDX-License-Identifier: MIT
@@ -29,7 +27,7 @@ using trace_instr_format_t = input_instr;
 
 
 trace_instr_format_t curr_instr[MAX_THREADS];
-THREADID champsim_trace_tid_min = 3; // thr 16 should be a thread of interest for us, for most apps
+THREADID champsim_trace_tid_min = 2; // thr 16 should be a thread of interest for us, for most apps
 THREADID champsim_trace_tid_max = 3; 
 
 std::ofstream dummyofs; //for decltype compiler error suppression
@@ -309,9 +307,9 @@ void WriteCurrentInstruction(THREADID tid)
 //   if (ins_count[champsim_trace_tid] < champsim_skipins){
 //     return;
 //   }
-  //typename decltype(champsim_outfile)::char_type buf[sizeof(trace_instr_format_t)];
+  //typename decltype(champsim_outfile[tid])::char_type buf[sizeof(trace_instr_format_t)];
   typename decltype(dummyofs)::char_type buf[sizeof(trace_instr_format_t)];
-  std::memcpy(buf, &curr_instr[tid], sizeof(trace_instr_format_t));
+  std::memcpy(buf, &(curr_instr[tid]), sizeof(trace_instr_format_t));
   champsim_outfile[tid].write(buf, sizeof(trace_instr_format_t));
 }
 void BranchOrNot(UINT32 taken, THREADID tid)
@@ -325,22 +323,8 @@ void BranchOrNot(UINT32 taken, THREADID tid)
     curr_instr[tid].is_branch = 1;
     curr_instr[tid].branch_taken = taken;
 }
-// template <typename T>
-// void WriteToSet(T* begin, T* end, UINT32 r, THREADID tid)
-// {
-//     if(!(is_champsim_trace_tid(tid))){
-//         return;
-//     }
-//     if (cst_open[tid] == false) {
-//         return;
-//     }
-//   auto set_end = std::find(begin, end, 0);
-//   auto found_reg = std::find(begin, set_end, r); // check to see if this register is already in the list
-//   *found_reg = r;
-// }
-
 template <typename T>
-void WriteToSet_source(trace_instr_format_t* currinst, UINT32 r, THREADID tid)
+void WriteToSet(T* begin, T* end, UINT32 r, THREADID tid)
 {
     if(!(is_champsim_trace_tid(tid))){
         return;
@@ -348,54 +332,13 @@ void WriteToSet_source(trace_instr_format_t* currinst, UINT32 r, THREADID tid)
     if (cst_open[tid] == false) {
         return;
     }
-    T* begin = currinst[tid].source_registers;
-    T* end = currinst[tid].source_registers + NUM_INSTR_SOURCES;
-    auto set_end = std::find(begin, end, 0);
-    auto found_reg = std::find(begin, set_end, r); // check to see if this register is already in the list
-    *found_reg = r;
+  auto set_end = std::find(begin, end, 0);
+  auto found_reg = std::find(begin, set_end, r); // check to see if this register is already in the list
+  *found_reg = r;
 }
-
-template <typename T>
-void WriteToSet_dest(trace_instr_format_t* currinst, UINT32 r, THREADID tid)
-{
-    if(!(is_champsim_trace_tid(tid))){
-        return;
-    }
-    if (cst_open[tid] == false) {
-        return;
-    }
-    T* begin = currinst[tid].destination_registers;
-    T* end = currinst[tid].destination_registers + NUM_INSTR_DESTINATIONS;
-    auto set_end = std::find(begin, end, 0);
-    auto found_reg = std::find(begin, set_end, r); // check to see if this register is already in the list
-    *found_reg = r;
-}
-
-
 int dummy1=0;
-// template <typename T>
-// void WriteToSet_mem(T* begin, T* end, UINT64 r, THREADID tid)
-// {
-//     if(!(is_champsim_trace_tid(tid))){
-//         return;
-//     }
-//     if (cst_open[tid] == false) {
-//         return;
-//     }
-
-//     ///dbg
-//     if(dummy1<10){
-//         dummy1++;
-//     std::cout<<"r     : "<<std::hex<<r<<std::endl;
-//     std::cout<<"r_page: "<<std::hex<<(r>>12)<<std::dec<<std::endl;
-//     }
-//   auto set_end = std::find(begin, end, 0);
-//   auto found_reg = std::find(begin, set_end, r); // check to see if this register is already in the list
-//   *found_reg = r;
-// }
-
 template <typename T>
-void WriteToSet_mem_source(trace_instr_format_t* currinst, UINT64 r, THREADID tid)
+void WriteToSet_mem(T* begin, T* end, UINT64 r, THREADID tid)
 {
     if(!(is_champsim_trace_tid(tid))){
         return;
@@ -405,35 +348,15 @@ void WriteToSet_mem_source(trace_instr_format_t* currinst, UINT64 r, THREADID ti
     }
 
     ///dbg
-    if(dummy1<10){
-        dummy1++;
-    std::cout<<"r     : "<<std::hex<<r<<std::endl;
-    std::cout<<"r_page: "<<std::hex<<(r>>12)<<std::dec<<std::endl;
-    }
-    T* begin = currinst[tid].source_memory;
-    T* end = currinst[tid].source_memory + NUM_INSTR_SOURCES;
+    // if(dummy1<10){
+    //     dummy1++;
+    // std::cout<<"r     : "<<std::hex<<r<<std::endl;
+    // std::cout<<"r_page: "<<std::hex<<(r>>12)<<std::dec<<std::endl;
+    // }
   auto set_end = std::find(begin, end, 0);
   auto found_reg = std::find(begin, set_end, r); // check to see if this register is already in the list
   *found_reg = r;
 }
-
-template <typename T>
-void WriteToSet_mem_dest(trace_instr_format_t* currinst, UINT64 r, THREADID tid)
-{
-    if(!(is_champsim_trace_tid(tid))){
-        return;
-    }
-    if (cst_open[tid] == false) {
-        return;
-    }
-
-    T* begin = currinst[tid].destination_memory;
-    T* end = currinst[tid].destination_memory+ NUM_INSTR_DESTINATIONS;
-  auto set_end = std::find(begin, end, 0);
-  auto found_reg = std::find(begin, set_end, r); // check to see if this register is already in the list
-  *found_reg = r;
-}
-
 void ResetCurrentInstruction(VOID *ip, THREADID tid)
 {
     if(!(is_champsim_trace_tid(tid))){
@@ -587,12 +510,16 @@ static VOID Instruction(INS ins, VOID* v)
             INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BranchOrNot, IARG_BRANCH_TAKEN, IARG_THREAD_ID, IARG_END);
 
         // instrument register reads
+        THREADID curtid = PIN_ThreadId();
+        if(curtid>15){
+            std::cout<<"curtid > 15: "<<curtid<<std::endl;
+        }
         UINT32 readRegCount = INS_MaxNumRRegs(ins);
         for(UINT32 i=0; i<readRegCount; i++) 
         {
             UINT32 regNum = INS_RegR(ins, i);
-            INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet_source<unsigned char>,
-                IARG_PTR, curr_instr,
+            INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet<unsigned char>,
+                IARG_PTR, curr_instr[curtid].source_registers, IARG_PTR, curr_instr[curtid].source_registers + NUM_INSTR_SOURCES,
                 IARG_UINT32, regNum, IARG_THREAD_ID, IARG_END);
         }
 
@@ -601,8 +528,8 @@ static VOID Instruction(INS ins, VOID* v)
         for(UINT32 i=0; i<writeRegCount; i++) 
         {
             UINT32 regNum = INS_RegW(ins, i);
-            INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet_dest<unsigned char>,
-                IARG_PTR, curr_instr,
+            INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet<unsigned char>,
+                IARG_PTR, curr_instr[curtid].destination_registers, IARG_PTR, curr_instr[curtid].destination_registers + NUM_INSTR_DESTINATIONS,
                 IARG_UINT32, regNum, IARG_THREAD_ID, IARG_END);
         }
 
@@ -613,12 +540,12 @@ static VOID Instruction(INS ins, VOID* v)
         for (UINT32 memOp = 0; memOp < memOperands; memOp++) 
         {
             if (INS_MemoryOperandIsRead(ins, memOp)) 
-                INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet_mem_source<unsigned long long int>,
-                    IARG_PTR, curr_instr,
+                INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet_mem<unsigned long long int>,
+                    IARG_PTR, curr_instr[curtid].source_memory, IARG_PTR, curr_instr[curtid].source_memory + NUM_INSTR_SOURCES,
                     IARG_MEMORYOP_EA, memOp, IARG_THREAD_ID, IARG_END);
             if (INS_MemoryOperandIsWritten(ins, memOp)) 
-                INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet_mem_dest<unsigned long long int>,
-                    IARG_PTR, curr_instr,
+                INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)WriteToSet_mem<unsigned long long int>,
+                    IARG_PTR, curr_instr[curtid].destination_memory, IARG_PTR, curr_instr[curtid].destination_memory + NUM_INSTR_DESTINATIONS,
                     IARG_MEMORYOP_EA, memOp, IARG_THREAD_ID, IARG_END);
         }
 

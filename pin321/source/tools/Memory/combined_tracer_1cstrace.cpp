@@ -28,7 +28,7 @@ using trace_instr_format_t = input_instr;
 
 trace_instr_format_t curr_instr;
 //THREADID champsim_trace_tid = 15; // thr 16 should be a thread of interest for us, for most apps
-THREADID champsim_trace_tid = 3; // debugging with less threads
+THREADID champsim_trace_tid = 0; // debugging with less threads
 
 std::ofstream champsim_outfile;
 

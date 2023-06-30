@@ -29,7 +29,7 @@ using trace_instr_format_t = input_instr;
 
 
 trace_instr_format_t curr_instr[MAX_THREADS];
-THREADID champsim_trace_tid_min = 3; // thr 16 should be a thread of interest for us, for most apps
+THREADID champsim_trace_tid_min = 0; // thr 16 should be a thread of interest for us, for most apps
 THREADID champsim_trace_tid_max = 3; 
 
 std::ofstream dummyofs; //for decltype compiler error suppression

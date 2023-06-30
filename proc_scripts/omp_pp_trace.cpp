@@ -260,6 +260,12 @@ int process_phase(){
 		for(const auto& pt : page_access_counts_per_thread[ii]){
 			page_access_counts[socketid][pt.first]=page_access_counts[socketid][pt.first]+pt.second;
 		}
+		for(const auto& pt : page_access_counts_W_per_thread[ii]){
+			page_access_counts_W[socketid][pt.first]=page_access_counts_W[socketid][pt.first]+pt.second;
+		}
+		for(const auto& pt : page_access_counts_R_per_thread[ii]){
+			page_access_counts_R[socketid][pt.first]=page_access_counts_R[socketid][pt.first]+pt.second;
+		}
 	}
 
 
@@ -354,18 +360,20 @@ int process_phase(){
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// Populate access sharer histogram
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	U64 pac_size = page_access_counts.size();
+	U64 pac_size = page_access_counts_consol.size();
 	assert(pac_size==N_SOCKETS);
 	for(U64 i=0; i<pac_size;i++){
-		auto pac   = page_access_counts[i];
-		auto pac_W = page_access_counts_W[i];
-		auto pac_R = page_access_counts_R[i];
+		auto pac   = page_access_counts_consol[i];
+		auto pac_W = page_access_counts_W_consol[i];
+		auto pac_R = page_access_counts_R_consol[i];
 		for (const auto& ppair : pac) {
 			U64 page = ppair.first;
 			U64 accs = ppair.second;
 			U64 rds= pac_R[page];
 			U64 wrs= pac_W[page];
-			U64 sharers = page_sharers[page];
+			//U64 sharers = page_sharers[page];
+			U64 sharers = page_sharers_long[page];
+			assert(sharers>0);
 			hist_access_sharers[sharers]=hist_access_sharers[sharers]+accs;
 			hist_access_sharers_W[sharers]=hist_access_sharers_W[sharers]+wrs;
 			if(page_Ws[page]!=0){
@@ -455,7 +463,8 @@ int process_phase(){
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// Populate page sharer histogram
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	for (const auto& pss : page_sharers) {
+	//for (const auto& pss : page_sharers) {
+	for (const auto& pss : page_sharers_long) {
 		U64 sharers = pss.second;
 		U64 page = pss.first;
 		hist_page_sharers[sharers]=hist_page_sharers[sharers]+1;

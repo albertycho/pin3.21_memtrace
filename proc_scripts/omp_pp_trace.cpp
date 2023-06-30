@@ -321,7 +321,7 @@ int process_phase(){
 		for (const auto& ppair : pa_c) {
 			U64 page = ppair.first;
 			page_sharers_long[page]=page_sharers_long[page]+1;
-			assert(page_sharers_long[page] < N_THR+1);
+			assert(page_sharers_long[page] < N_SOCKETS+1);
 		}
 	}
 
@@ -332,7 +332,7 @@ int process_phase(){
 		for (const auto& ppair : pa_c) {
 			U64 page = ppair.first;
 			page_sharers[page]=page_sharers[page]+1;
-			assert(page_sharers[page] < N_THR+1);
+			assert(page_sharers[page] < N_SOCKETS+1);
 		}
 	}
 	
@@ -355,7 +355,7 @@ int process_phase(){
 	// Populate access sharer histogram
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	U64 pac_size = page_access_counts.size();
-	assert(pac_size==N_THR);
+	assert(pac_size==N_SOCKETS);
 	for(U64 i=0; i<pac_size;i++){
 		auto pac   = page_access_counts[i];
 		auto pac_W = page_access_counts_W[i];
@@ -485,7 +485,8 @@ int process_phase(){
 		save_uo_map(page_owner,"page_owner.txt\0");
 		save_uo_map(page_owner_CI,"page_owner_CI.txt\0");
 	//}
-	
+
+
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// Reassign owners
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -501,7 +502,7 @@ int process_phase(){
 			U64 page  = it_migration->first;
 			U64 most_acc=0;
 			U64 new_owner=INVAL_OWNER;
-			for(U64 j=0; j<N_THR;j++){
+			for(U64 j=0; j<N_SOCKETS;j++){
 				if(page_access_counts_consol[j][page]>most_acc){
 					most_acc = page_access_counts[j][page];
 					new_owner=j;
@@ -597,7 +598,8 @@ int process_phase(){
 		}
 	}
 
-	
+	std::cout<<"reassign owners done"<<std::endl;
+
 	U64 total_pages = page_sharers.size();
 	U64 memory_touched = total_pages*PAGESIZE;
 	U64 memory_touched_inMB = memory_touched>>20;
@@ -625,22 +627,22 @@ int process_phase(){
 	cout<<"link traffic between 5 and 12: "<< linktraffic_5_12_CI<<endl;
 	cout<<"traffic to CI from a single node(5): "<<CI_traffic_R[5]+CI_traffic_W[5]<<endl;
 
-	savearray(hist_access_sharers, N_THR_OFFSET,"access_hist.txt\0");
-	savearray(hist_access_sharers_W, N_THR_OFFSET,"access_hist_W.txt\0");
-	savearray(hist_access_sharers_R_to_RWP, N_THR_OFFSET,"access_hist_R_to_RWP.txt\0");
-	savearray(hist_access_sharers_R, N_THR_OFFSET,"access_hist_R.txt\0");
-	savearray(hist_page_sharers, N_THR_OFFSET,"page_hist.txt\0");
-	savearray(hist_page_sharers_W, N_THR_OFFSET,"page_hist_W.txt\0");
-	savearray(hist_page_sharers_R, N_THR_OFFSET,"page_hist_R.txt\0");
-	save2Darr(hist_page_shareres_nacc, N_THR_OFFSET, "page_hist_nacc.txt\0");
+	savearray(hist_access_sharers, N_SOCKETS_OFFSET,"access_hist.txt\0");
+	savearray(hist_access_sharers_W, N_SOCKETS_OFFSET,"access_hist_W.txt\0");
+	savearray(hist_access_sharers_R_to_RWP, N_SOCKETS_OFFSET,"access_hist_R_to_RWP.txt\0");
+	savearray(hist_access_sharers_R, N_SOCKETS_OFFSET,"access_hist_R.txt\0");
+	savearray(hist_page_sharers, N_SOCKETS_OFFSET,"page_hist.txt\0");
+	savearray(hist_page_sharers_W, N_SOCKETS_OFFSET,"page_hist_W.txt\0");
+	savearray(hist_page_sharers_R, N_SOCKETS_OFFSET,"page_hist_R.txt\0");
+	save2Darr(hist_page_shareres_nacc, N_SOCKETS_OFFSET, "page_hist_nacc.txt\0");
 
-	save_hophist(hop_hist_W,N_THR_OFFSET, "hop_hist_W.txt\0");
-	save_hophist(hop_hist_RO,N_THR_OFFSET, "hop_hist_RO.txt\0");
-	save_hophist(hop_hist_RtoRW,N_THR_OFFSET, "hop_hist_RtoRW.txt\0");
+	save_hophist(hop_hist_W,N_SOCKETS_OFFSET, "hop_hist_W.txt\0");
+	save_hophist(hop_hist_RO,N_SOCKETS_OFFSET, "hop_hist_RO.txt\0");
+	save_hophist(hop_hist_RtoRW,N_SOCKETS_OFFSET, "hop_hist_RtoRW.txt\0");
 
-	save_hophist(hop_hist_W_CI,N_THR_OFFSET, "hop_hist_W_CI.txt\0");
-	save_hophist(hop_hist_RO_CI,N_THR_OFFSET, "hop_hist_RO_CI.txt\0");
-	save_hophist(hop_hist_RtoRW_CI,N_THR_OFFSET, "hop_hist_RtoRW_CI.txt\0");
+	save_hophist(hop_hist_W_CI,N_SOCKETS_OFFSET, "hop_hist_W_CI.txt\0");
+	save_hophist(hop_hist_RO_CI,N_SOCKETS_OFFSET, "hop_hist_RO_CI.txt\0");
+	save_hophist(hop_hist_RtoRW_CI,N_SOCKETS_OFFSET, "hop_hist_RtoRW_CI.txt\0");
 
 	
 	curphase=curphase+1;

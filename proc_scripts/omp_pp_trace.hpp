@@ -22,15 +22,17 @@
 
 #define PAGESIZE 4096
 #define PAGEBITS 12
-#define N_THR 16
+#define N_THR 64
+#define N_SOCKETS 16
 //#define THR_OFFSET_VAL 2
 #define THR_OFFSET_VAL 0
 #define N_THR_OFFSET (N_THR+1)
+#define N_SOCKETS_OFFSET (N_SOCKETS+1)
 #define U64 uint64_t
 #define CXO 100 //CXL Island is owner
 #define SHARER_THRESHOLD 8
 #define INVAL_OWNER 9999
-#define PHASE_CYCLES 10000000
+#define PHASE_CYCLES 100000000
 
 #define NBILLION 1000000000
 #define HISTORY_LEN ((uint64_t)(NBILLION/PHASE_CYCLES))
@@ -56,7 +58,7 @@ int read_8B_line(uint64_t * buf_val, char* buffer, FILE* fptr){
 string generate_phasedirname(){
 	stringstream ss;
 	//ss<<"1BPhase"<<curphase;
-	ss<<"10MPhase"<<curphase;
+	ss<<"100MPhase"<<curphase;
 	string dir_name=ss.str();
 	return dir_name;
 }
@@ -125,7 +127,7 @@ int savearray(U64 * arr, U64 arrsize, string savefilename){
 	return 0;
 }
 
-int save2Darr(U64 arr[][N_THR_OFFSET], U64 arrsize, string savefilename){
+int save2Darr(U64 arr[][N_SOCKETS_OFFSET], U64 arrsize, string savefilename){
 	string savefilename_full=generate_full_savefilename(savefilename);
 	std::ofstream file(savefilename_full);
 	//cout<<"does code get here 88"<<endl;

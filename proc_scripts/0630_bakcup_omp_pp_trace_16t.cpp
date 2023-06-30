@@ -85,14 +85,10 @@ int process_phase(){
 	phase_end_cycle=phase_end_cycle+PHASE_CYCLES;
 	//page accesses
 	//vector<unordered_map<uint64_t, uint64_t>> page_access_counts={};
-	vector<unordered_map<uint64_t, uint64_t>> page_access_counts(N_SOCKETS);
-	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_R(N_SOCKETS);
-	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_W(N_SOCKETS);
+	vector<unordered_map<uint64_t, uint64_t>> page_access_counts(N_THR);
+	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_R(N_THR);
+	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_W(N_THR);
 	
-	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_per_thread(N_THR);
-	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_R_per_thread(N_THR);
-	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_W_per_thread(N_THR);
-
 	//list of all unique pages and their sharer count
 	unordered_map<uint64_t, uint64_t> page_sharers={};
 	//list of all unique pags and their R/W count
@@ -102,39 +98,39 @@ int process_phase(){
 	std::multiset<std::pair<uint64_t, uint64_t>, migration_compare> sorted_candidates;
 
 	// list of links (track traffic per link)
-	U64 link_traffic_R[N_SOCKETS][N_SOCKETS]={0};
-	U64 link_traffic_W[N_SOCKETS][N_SOCKETS]={0};
-	U64 link_traffic_R_CI[N_SOCKETS][N_SOCKETS]={0};
-	U64 link_traffic_W_CI[N_SOCKETS][N_SOCKETS]={0};
-	U64	CI_traffic_R[N_SOCKETS]={0};
-	U64	CI_traffic_W[N_SOCKETS]={0};
+	U64 link_traffic_R[N_THR][N_THR]={0};
+	U64 link_traffic_W[N_THR][N_THR]={0};
+	U64 link_traffic_R_CI[N_THR][N_THR]={0};
+	U64 link_traffic_W_CI[N_THR][N_THR]={0};
+	U64	CI_traffic_R[N_THR]={0};
+	U64	CI_traffic_W[N_THR]={0};
 
 	// traffic at memory controller on each ndoe
-	U64 mem_traffic[N_SOCKETS]={0};
-	U64 mem_traffic_CI[N_SOCKETS]={0};
+	U64 mem_traffic[N_THR]={0};
+	U64 mem_traffic_CI[N_THR]={0};
 	
 	U64 migrated_pages=0;
 	U64 migrated_pages_CI=0;
 	U64 pages_to_CI=0;
 
 	//Histograms
-	uint64_t hist_access_sharers[N_SOCKETS_OFFSET]={0};
-	uint64_t hist_access_sharers_R[N_SOCKETS_OFFSET]={0};
-	uint64_t hist_access_sharers_R_to_RWP[N_SOCKETS_OFFSET]={0};
-	uint64_t hist_access_sharers_W[N_SOCKETS_OFFSET]={0};
-	uint64_t hist_page_sharers[N_SOCKETS_OFFSET]={0};
-	uint64_t hist_page_sharers_R[N_SOCKETS_OFFSET]={0};
-	uint64_t hist_page_sharers_W[N_SOCKETS_OFFSET]={0};
-	uint64_t hist_page_shareres_nacc[10][N_SOCKETS_OFFSET]={0};
+	uint64_t hist_access_sharers[N_THR_OFFSET]={0};
+	uint64_t hist_access_sharers_R[N_THR_OFFSET]={0};
+	uint64_t hist_access_sharers_R_to_RWP[N_THR_OFFSET]={0};
+	uint64_t hist_access_sharers_W[N_THR_OFFSET]={0};
+	uint64_t hist_page_sharers[N_THR_OFFSET]={0};
+	uint64_t hist_page_sharers_R[N_THR_OFFSET]={0};
+	uint64_t hist_page_sharers_W[N_THR_OFFSET]={0};
+	uint64_t hist_page_shareres_nacc[10][N_THR_OFFSET]={0};
 
-	uint64_t hop_hist_W[N_SOCKETS_OFFSET][4]={0};
-	uint64_t hop_hist_RtoRW[N_SOCKETS_OFFSET][4]={0};
-	uint64_t hop_hist_RO[N_SOCKETS_OFFSET][4]={0};
-	uint64_t hop_hist_W_CI[N_SOCKETS_OFFSET][4]={0};
-	uint64_t hop_hist_RtoRW_CI[N_SOCKETS_OFFSET][4]={0};
-	uint64_t hop_hist_RO_CI[N_SOCKETS_OFFSET][4]={0};
+	uint64_t hop_hist_W[N_THR_OFFSET][4]={0};
+	uint64_t hop_hist_RtoRW[N_THR_OFFSET][4]={0};
+	uint64_t hop_hist_RO[N_THR_OFFSET][4]={0};
+	uint64_t hop_hist_W_CI[N_THR_OFFSET][4]={0};
+	uint64_t hop_hist_RtoRW_CI[N_THR_OFFSET][4]={0};
+	uint64_t hop_hist_RO_CI[N_THR_OFFSET][4]={0};
 
-	U64 total_num_accs[N_SOCKETS]={0};
+	U64 total_num_accs[N_THR]={0};
 
 	#pragma omp parallel for
 	for (int i=0; i<N_THR;i++){
@@ -231,9 +227,12 @@ int process_phase(){
 		total_num_accs[i]+=tmp_numacc;
 		#pragma omp critical
 		{
-			page_access_counts_per_thread[i]=pa_count;
-			page_access_counts_W_per_thread[i]=(pa_count_W);
-			page_access_counts_R_per_thread[i]=(pa_count_R);
+			// page_access_counts.push_back(pa_count);
+			// page_access_counts_W.push_back(pa_count_W);
+			// page_access_counts_R.push_back(pa_count_R);
+			page_access_counts[i]=pa_count;
+			page_access_counts_W[i]=(pa_count_W);
+			page_access_counts_R[i]=(pa_count_R);
 			misc_log_full<<"t_"<<i<<" accesses this phase: "<<tmp_numacc<<endl;
 			
 		}
@@ -253,15 +252,6 @@ int process_phase(){
 		}
 
 	}
-	
-	//consoliate page_access_counts per thread into per socket
-	for(uint64_t ii=0; ii<N_THR; ii++){
-		uint64_t socketid = ii>>2; //4 cores per socket
-		for(const auto& pt : page_access_counts_per_thread[ii]){
-			page_access_counts[socketid][pt.first]=page_access_counts[socketid][pt.first]+pt.second;
-		}
-	}
-
 
 	//update access data from past 1 billion instructions
 	page_access_counts_history.push_back(page_access_counts);
@@ -282,14 +272,14 @@ int process_phase(){
 	// log sharers for each page for the past 1 Billion insts
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// build accesses per thread 
-	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_consol(N_SOCKETS);
-	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_R_consol(N_SOCKETS);
-	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_W_consol(N_SOCKETS);
+	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_consol(N_THR);
+	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_R_consol(N_THR);
+	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_W_consol(N_THR);
 	unordered_map<uint64_t, uint64_t> page_Rs_consol={};
 	unordered_map<uint64_t, uint64_t> page_Ws_consol={};
 	
 	#pragma omp parallel for
-	for(uint64_t ii=0;ii<N_SOCKETS;ii++){
+	for(uint64_t ii=0;ii<N_THR;ii++){
 		for(uint64_t jj=0;jj<page_access_counts_history.size();jj++){
 			for (const auto& ppair : page_access_counts_history[jj][ii]){
 				U64 page = ppair.first;
@@ -602,7 +592,7 @@ int process_phase(){
 	U64 memory_touched = total_pages*PAGESIZE;
 	U64 memory_touched_inMB = memory_touched>>20;
 	U64 sumallacc=0;
-	for(U64 i=0;i<N_SOCKETS;i++){
+	for(U64 i=0;i<N_THR;i++){
 		sumallacc+=total_num_accs[i];
 	}
 	/// find all pages whose owner is CXI, to get memory size on CXI

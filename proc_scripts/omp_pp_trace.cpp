@@ -134,7 +134,7 @@ int process_phase(){
 	uint64_t hop_hist_RtoRW_CI[N_SOCKETS_OFFSET][4]={0};
 	uint64_t hop_hist_RO_CI[N_SOCKETS_OFFSET][4]={0};
 
-	U64 total_num_accs[N_SOCKETS]={0};
+	U64 total_num_accs[N_THR]={0};
 
 	#pragma omp parallel for
 	for (int i=0; i<N_THR;i++){
@@ -360,6 +360,8 @@ int process_phase(){
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// Populate access sharer histogram
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	//dbg
+	cout<<"hist_access_sharers[0]: " <<hist_access_sharers[0]<<endl;
 	U64 pac_size = page_access_counts_consol.size();
 	assert(pac_size==N_SOCKETS);
 	for(U64 i=0; i<pac_size;i++){

@@ -11,17 +11,20 @@ with open('collected_smart_stats.txt', 'r') as csvfile:
     base_amats = []
     cxi_amats = []
     for row in reader:
-        if len(row) == 5:  # Make sure we have a full row of data
-            benchmarks.append(row[0])
-            base_IPC = float(row[1])
-            cxi_IPC = float(row[2])
-            normalized_IPCs.append(cxi_IPC / base_IPC if base_IPC else 0)  # Avoid division by zero
-            base_amats.append(float(row[3]))
-            cxi_amats.append(float(row[4]))
+        print(row)
+        #if len(row) == 5:  # Make sure we have a full row of data
+        benchmarks.append(row[0])
+        base_IPC = float(row[1])
+        cxi_IPC = float(row[2])
+        normalized_IPCs.append(cxi_IPC / base_IPC if base_IPC else 0)  # Avoid division by zero
+        base_amats.append(float(row[3]))
+        cxi_amats.append(float(row[4]))
 
 
 plt.rcParams.update({'font.size': 14})
 labelfontsize=20
+
+print(base_amats)
 
 # Plot normalized IPCs
 plt.figure(figsize=(10, 6))

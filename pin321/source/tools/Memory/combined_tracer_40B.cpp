@@ -125,6 +125,9 @@ static UL3::CACHE *ul3[MAX_THREADS];
 
 
 static inline VOID dump_tbuf(THREADID tid) { //TODO add threaID to arg
+	if(tid>=MAX_THREADS){
+		return;
+	}
     //added this as an optimization, but doesn't seem to save runtime much :(
     uint64_t tmp_tbi = tb_i[tid];
     for (uint64_t i = 0; i < tmp_tbi; i++) {
@@ -155,6 +158,10 @@ static VOID Fini(int code, VOID* v) //TODO this should change to threadfini?
 
 }
 VOID ThreadFini(THREADID tid, const CONTEXT* ctxt, INT32 code, VOID* v) {
+	if(tid>=MAX_THREADS){
+		return;
+	}
+
     dump_tbuf(tid);
     std::cout <<"thread_"<<tid << " num mem accesses: " << num_maccess[tid] << std::endl;
     std::cout << "thread_" << tid << " Fini finished" << std::endl;
@@ -163,6 +170,10 @@ VOID ThreadFini(THREADID tid, const CONTEXT* ctxt, INT32 code, VOID* v) {
 }
 
 static inline VOID recordAccess(ADDRINT addr, THREADID tid, CACHE_BASE::ACCESS_TYPE accessType) { //TODO add threaID to arg
+	if(tid>=MAX_THREADS){
+		return;
+	}
+
     num_maccess[tid]++;
     t_buf[tid][tb_i[tid]] = addr;
 	rw_buf[tid][tb_i[tid]] = accessType;
@@ -175,6 +186,10 @@ static inline VOID recordAccess(ADDRINT addr, THREADID tid, CACHE_BASE::ACCESS_T
 
 static inline VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid, bool dirtyEv_fromL2, bool isIns=false) ////TODO add threaID to arg
 {
+	if(tid>=MAX_THREADS){
+		return;
+	}
+
     ADDRINT evicted_line=0;
     //const BOOL ul3hit = ul3[tid]->Access(addr, size, accessType);
     const BOOL ul3hit = ul3[tid]->Access(addr, size, accessType, evicted_line);
@@ -193,6 +208,10 @@ static inline VOID Ul3Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE 
 
 static VOID Ul2Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid, bool isIns=false)
 {
+	if(tid>=MAX_THREADS){
+		return;
+	}
+
     ADDRINT evicted_line=0;
     // second level unified cache
     const BOOL ul2Hit = ul2[tid]->Access(addr, size, accessType, evicted_line);
@@ -208,6 +227,10 @@ static VOID Ul2Access(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessT
 }
 
 void open_champsim_trace(THREADID tid) {
+	if(tid>=MAX_THREADS){
+		return;
+	}
+
     std::ostringstream ctfname;
     cst_phase[tid]++;
     if (cst_phase[tid] != (ins_count[tid] / PHASE_INTERVAL)) {
@@ -228,6 +251,10 @@ void open_champsim_trace(THREADID tid) {
 }
 
 void close_champsim_trace(THREADID tid) {
+	if(tid>=MAX_THREADS){
+		return;
+	}
+
     if (champsim_outfile[tid].is_open()) {
         champsim_outfile[tid].close();
         cst_open[tid] = false;
@@ -250,6 +277,9 @@ inline bool is_champsim_trace_tid(THREADID tid){
 
 BOOL ShouldWrite(THREADID tid)
 {//TODO rewrite
+	if(tid>=MAX_THREADS){
+		return false;
+	}
 
   if(!(is_champsim_trace_tid(tid))){
         return false;
@@ -292,6 +322,7 @@ BOOL ShouldWrite(THREADID tid)
 
 void WriteCurrentInstruction(THREADID tid)
 {
+
     if(!(is_champsim_trace_tid(tid))){
         return;
     }
@@ -447,6 +478,10 @@ void ResetCurrentInstruction(VOID *ip, THREADID tid)
 }
 static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 {
+	if(tid>=MAX_THREADS){
+		return;
+	}
+
 	BOOL inROI_check = (inROI[tid]) || (inROI_master);
     if(!inROI_check){
     //if(!inROI[tid]){
@@ -458,8 +493,8 @@ static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
     // }
 
 
-    if(ins_count[tid] > 20000000000){
-		std::cout<<"killing after 20B instructions"<<std::endl;
+    if(ins_count[tid] > 40000000000){
+		std::cout<<"killing after 40B instructions"<<std::endl;
 		exit(0);
 	}
 
@@ -495,6 +530,10 @@ static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 
 static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid) //TODO add threaID to arg
 {
+	if(tid>=MAX_THREADS){
+		return;
+	}
+
 	BOOL inROI_check = (inROI[tid]) || (inROI_master);
     if(!inROI_check){
     //if(!inROI[tid]){
@@ -525,6 +564,10 @@ static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE acces
 
 static VOID MemRefSingle(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE accessType, THREADID tid) //TODO add threaID to arg
 {
+	if(tid>=MAX_THREADS){
+		return;
+	}
+
 	BOOL inROI_check = (inROI[tid]) || (inROI_master);
     if(!inROI_check){
         return;
@@ -544,6 +587,10 @@ static VOID MemRefSingle(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE acce
 }
 
 static VOID pin_magic_inst(THREADID tid, ADDRINT value, ADDRINT field){
+	if(tid>=MAX_THREADS){
+		return;
+	}
+
         switch(field){
             case 0x0: //ROI START
                 inROI[tid]=true;
@@ -675,6 +722,10 @@ static VOID Instruction(INS ins, VOID* v)
 }
 
 VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) {
+	if(tid>=MAX_THREADS){
+		return;
+	}
+
     std::cout << "thread_" << tid<< " start" << std::endl;
     numThreads++;
     //std::string tfname = "memtrace_t" + std::to_string(tid) + ".out";

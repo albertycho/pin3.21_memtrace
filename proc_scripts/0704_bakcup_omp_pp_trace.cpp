@@ -57,7 +57,6 @@ vector<unordered_map<uint64_t, uint64_t>> page_access_counts_dummy;
 //unordered_map<uint64_t, uint64_t> page_Ws;
 unordered_map<uint64_t, uint64_t> page_owner;
 unordered_map<uint64_t, uint64_t> page_owner_CI;
-uint64_t pages_in_pool = 0;
 
 unordered_map<uint64_t, uint64_t> migration_per_page;
 unordered_map<uint64_t, uint64_t> migration_per_page_CI;
@@ -351,10 +350,9 @@ int process_phase(){
 		U64 page = ppair.first;
 		U64 accs = ppair.second + page_Ws_consol[page];
 		//TODO can probably skip pages that have low accs, like < 100
-		//if(accs>100){
-		//dumping everything - for evictino from pool
+		if(accs>100){
 			sorted_candidates.insert({page, accs});
-		//}
+		}
 	}
 	//cout<<"sorted candidates size: "<<sorted_candidates.size()<<endl;
 
@@ -504,7 +502,6 @@ int process_phase(){
 	// Reassign owners
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	if(LIMIT_MIGRATION){
-		uint64_t pool_cap = (page_owner_CI.size())/5;
 		auto it_migration = sorted_candidates.begin();
 		//for(int i=0;i<MIGRATION_LIMIT;i++){
 		uint64_t i=0;
@@ -542,39 +539,12 @@ int process_phase(){
 				U64 old_owner = page_owner_CI[page];
 				if (migration_per_page_CI[page] <= (curphase/4)) {
 					if (sharers >= SHARER_THRESHOLD) {
-
 						// with replication allowed, would have to check RW ratio and take appropraite step
 						if (page_owner_CI[page] != CXO) {
 							pages_to_CI++;
-							pages_in_pool++;
 							i_cxi++;
 							page_owner_CI[page] = CXO;
 							migration_per_page_CI[page] = migration_per_page_CI[page] + 1;
-							//deal eviction if full capacity
-							if(pool_cap <= pages_in_pool){
-								//find eviction candidate
-								uint64_t evicted_page=0;
-								auto it = sorted_candidates.rbegin();
-								for(; it != sorted_candidates.rend(); ++it) {
-								    if(page_owner_CI[it->first] == CXO) {
-										evicted_page = it->first;
-								        break;
-								    }
-								}
-								if(it==sorted_candidates.rend()) cout<<"WARNING: needed to find eviction candidate from pool but didn't find"<<endl;
-								U64 ev_most_acc=0;
-								U64 ev_new_owner=rand() % N_SOCKETS;
-								for(U64 j=0; j<N_SOCKETS;j++){
-									if(page_access_counts_consol[j][evicted_page]>ev_most_acc){
-										ev_most_acc = page_access_counts[j][evicted_page];
-										ev_new_owner=j;
-									}
-								}
-
-								page_owner_CI[evicted_page] = ev_new_owner;
-								pages_in_pool--;
-
-							}
 						}
 					}
 					else {

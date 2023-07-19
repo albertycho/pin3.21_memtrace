@@ -29,3 +29,5 @@ proc_scripts/omp_pp_trace*
 proc_scripts/.plot_page_hists.py.swp
 *.swp
 */*.swp
+proc_scripts/.vscode/
+proc_scripts/.vscode/*

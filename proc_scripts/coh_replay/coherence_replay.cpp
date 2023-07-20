@@ -35,12 +35,23 @@ int main(){
     assert(isPowerOfTwo(NUM_SETS));
     syscycle=0;
 
-    CCD[200][150]={DState::I,10,64};
+    CCD[200][150]={DState::I,10,{0}};
     std::cout<<CCD[200][150].owner<<endl;
     
     init_caches();
 
-    //return 0; //for dbg
+    access_cache(caches[4], 0x7f0124124, true, 8274,0);
+    std::cout<<caches[4].entries[292][23].ts<<endl;
+    access_cache(caches[4], 0x7f0124124, true, 8278,1);
+    access_cache(caches[4], 0x7f0124124+(NUM_SETS*64), true, 8362,2);
+    std::cout<<caches[4].entries[292][23].ts<<endl;
+    std::cout<<caches[4].entries[292][22].ts<<endl;
+    std::cout<<"direcotry[292] size: "<<CCD[292].size()<<endl;
+    std::cout<<"direcotry[295] size: "<<CCD[295].size()<<endl;
+
+    log_cur_stats();
+
+    return 0; //for dbg
     //open traces
     for(int i=0; i<N_THR;i++){
 		std::ostringstream tfname;
@@ -92,12 +103,13 @@ int main(){
 
 
 /*
-access_cache(caches[4], 0x7f0124124, true, 8274);
-    std::cout<<caches[4].entries[18692][15].ts<<endl;
-    access_cache(caches[4], 0x7f0124124, true, 8278);
-    access_cache(caches[4], 0x7f0124124+(NUM_SETS*64), true, 8362);
-    std::cout<<caches[4].entries[18692][15].ts<<endl;
-
-
+    access_cache(caches[4], 0x7f0124124, true, 8274,0);
+    std::cout<<caches[4].entries[292][23].ts<<endl;
+    access_cache(caches[4], 0x7f0124124, true, 8278,1);
+    access_cache(caches[4], 0x7f0124124+(NUM_SETS*64), true, 8362,2);
+    std::cout<<caches[4].entries[292][23].ts<<endl;
+    std::cout<<caches[4].entries[292][22].ts<<endl;
+    std::cout<<"direcotry[292] size: "<<CCD[292].size()<<endl;
+    std::cout<<"direcotry[295] size: "<<CCD[295].size()<<endl;
 
 */

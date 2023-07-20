@@ -41,22 +41,27 @@ using namespace std;
 
 
 /// structs for DIRECTORY
-enum class DState {
-    I, 
-    S,
-	E,
-	M,
-    // add more states if required
-};
+// enum class DState {
+//     I, 
+//     S,
+// 	E,
+// 	M,
+//     // add more states if required
+// };
+
+typedef coh_state_t DState;
 
 struct DirectoryEntry {
-    DState state;
+    DState state=I;
     uint64_t owner;
-    uint64_t sharers;
+    //uint64_t sharers;
+	bool sharers[N_SOCKETS];
+	//DirectoryEntry(): state(I),owner(0),sharers({0}){}
 };
 typedef struct sim_stats {
     uint64_t m_reads;                 // read requests
     uint64_t m_writes;                // write requests
+	uint64_t m_writes_from_coh;       // write due to M->S
 	uint64_t c_invals;
 	uint64_t c_block_trans;
 	uint64_t total_m_insts;
@@ -71,7 +76,7 @@ uint64_t syscycle;
 unordered_map<uint64_t, DirectoryEntry> CCD[NUM_SETS]={}; //split into sets for quicker indexing?
 cache_t caches[N_SOCKETS];
 sim_stats_t simstats={0};
-std::ofstream output_log("coh_repl_log.txt");
+std::ofstream output_log("coh_repl12M_log_dbg.txt");
 
 
 ///cache functions
@@ -99,8 +104,130 @@ void init_caches(){
 	simstats.llc_misses=0;
 }
 
-void update_directory(uint64_t socket_id, uint64_t lineaddr){
+void update_directory(uint64_t socket_id, uint64_t lineaddr, uint64_t set_index, bool isW){
+	DirectoryEntry &de = CCD[set_index][lineaddr];
 
+	cout<<"directory state ";
+	switch(de.state){
+		case I:
+			cout<<"I"<<endl;
+			break;
+		case S:
+			cout<<"S"<<endl;
+			break;
+		case E:
+			cout<<"E"<<endl;
+			break;
+		case M:
+			cout<<"M"<<endl;
+			break;
+		default:
+			assert(0); //code should not get here
+	}
+
+	if(!isW){ //READS
+		switch(de.state){
+			case I:
+				//memrd++
+				//change state to E
+				simstats.m_reads++;
+				de.state=E;
+				break;
+			case S:
+				//do nothing (set sharers[socket_id], which is done at the end)
+				//if sharers[socket_id] was not set previously, memrd++
+				if(de.sharers[socket_id]==false){simstats.m_reads++;}
+				break;
+			case E:
+				// if owner is someone else, change to S, and change state of previous owner to S
+				//	TODO: c_blocktransfer ++
+				if(de.owner!=socket_id){
+					assert(de.sharers[socket_id]==false);
+					de.state=S;
+					for(int jj=0; jj<N_SOCKETS;jj++){
+						if(caches[de.owner].entries[set_index][jj].tag==lineaddr){
+							assert(caches[de.owner].entries[set_index][jj].cstate==E);
+							caches[de.owner].entries[set_index][jj].cstate=S;
+							break;
+						}
+					}
+
+					simstats.c_block_trans++;
+				}
+
+				// if owner is self, do nothing
+				break;
+			case M:
+				// if owner is someone else, change to S, 
+				//		and change state of previous owner to S(and unset dirtybit). mem_wr++
+				//		c_blocktransfer++
+				if(de.owner!=socket_id){
+					assert(de.sharers[socket_id]==false);
+					de.state=S;
+					for(int jj=0; jj<N_SOCKETS;jj++){
+						if(caches[de.owner].entries[set_index][jj].tag==lineaddr){
+							assert(caches[de.owner].entries[set_index][jj].cstate==M);
+							assert(caches[de.owner].entries[set_index][jj].dirty);
+							caches[de.owner].entries[set_index][jj].cstate=S;
+							caches[de.owner].entries[set_index][jj].dirty=false;
+							break;
+						}
+					}
+					simstats.m_writes_from_coh++;
+					simstats.c_block_trans++;
+				}
+				//if onwer is self, do nothing
+				break;
+			default:
+				assert(0); //code should not get here
+		}
+	}
+	else{ // WRITES
+		switch(de.state){
+			case I:
+				//mem_rd++
+				simstats.m_reads++;
+				break;
+			case S:
+				// send inval. go and invalidate entries in sharers (unset valid, dirty)
+				// 		set directory state to M
+				// if cur socket_id is not a sharer, mem_rd++
+				simstats.c_invals++;
+				if(de.sharers[socket_id]==false){simstats.m_reads++;}
+				for(int jj=0; jj<N_SOCKETS;jj++){
+					if(de.sharers[jj]){
+						de.sharers[jj]=false;
+						for(int ii=0;ii<NUM_WAYS;ii++){
+							if(caches[jj].entries[set_index][ii].tag==lineaddr){
+								caches[jj].entries[set_index][ii].cstate=I;
+								caches[jj].entries[set_index][ii].valid=false;
+								caches[jj].entries[set_index][ii].dirty=false;
+							}							
+						}
+					}
+				}
+				break;
+			case E:
+				// if owner is someone else, change to S, and change state of previous owner to I
+				//		blocktransfer++
+				// if owner is self, just set directory state to M
+				break;
+			case M:
+				// if owner is someone else, change to S, and change state of previous owner to I. 
+				//		block transfer++
+				//if onwer is self, do nothing
+
+				break;
+			default:
+				assert(0); //code should not get here
+		}
+		de.state=M;
+
+	}
+	//this is done for all cases
+	de.sharers[socket_id]=true;
+	de.owner=socket_id; //this isn't necessary for all cases, but is also not incorrect, and makes coding easier
+	
 }
 
 
@@ -143,7 +270,7 @@ uint64_t access_cache(cache_t& cach, uint64_t lineaddr, bool isW, uint64_t ts, u
     }
 
 	//update coherence directory here?
-	update_directory(socketid, lineaddr);
+	
 
     if(ishit){
 		//std::cout<<"ishit"<<endl;
@@ -152,7 +279,7 @@ uint64_t access_cache(cache_t& cach, uint64_t lineaddr, bool isW, uint64_t ts, u
             cach.entries[set_index][hit_i].dirty=true;            
         }
         cach.entries[set_index][hit_i].ts=ts;
-
+		update_directory(socketid, lineaddr, set_index, isW);
         return 0;
     }
 
@@ -163,6 +290,51 @@ uint64_t access_cache(cache_t& cach, uint64_t lineaddr, bool isW, uint64_t ts, u
         //TODO handle evicted line directory/coherence:
         // if state is E or M --> update directory state to I
         // if state is M --> m_write++;
+		uint64_t evicted_lineaddr = cach.entries[set_index][lru_i].tag;
+		DirectoryEntry &de = CCD[set_index][evicted_lineaddr];
+		if(cach.entries[set_index][lru_i].dirty){
+			//incrmenet mem_wr, set directory state to I, unset all sharers
+			//dbg
+			assert(cach.entries[set_index][lru_i].cstate==M);
+			assert(de.state==M);
+			assert(de.owner==socketid);
+
+			simstats.m_writes++;
+			de.sharers[socketid]=false;
+			de.state=I;
+		}
+		else{
+			//if E, and owner is self, set invalid
+			if(de.state==E){
+				//dbg
+				assert(de.owner==socketid);
+				assert(cach.entries[set_index][lru_i].cstate==E);
+				de.sharers[socketid]=false;
+				de.state=I;
+			}
+			else{
+				//dbg
+				assert(de.state==S);
+				de.sharers[socketid]=false;
+				uint64_t numsharers=0;
+				for(int jj=0; jj<N_SOCKETS;jj++){
+					if(de.sharers[jj]){
+						numsharers++;
+						if(jj!=socketid){de.owner=jj;}
+					}
+				}
+				assert(de.owner!=socketid); // should have at least one other node if in S
+				if(numsharers==1){
+					de.state=E;
+					for(int ii=0; ii<NUM_WAYS;ii++){
+						if(caches[de.owner].entries[set_index][ii].tag==evicted_lineaddr){
+							caches[de.owner].entries[set_index][ii].cstate=E;
+							break;
+						}
+					}					
+				}
+			}
+		}
 
     }
 
@@ -178,7 +350,16 @@ uint64_t access_cache(cache_t& cach, uint64_t lineaddr, bool isW, uint64_t ts, u
     //TODO handle directory/coherence
     
 	//std::cout<<"inserted index: "<<insert_i<<endl;
+	update_directory(socketid, lineaddr, set_index, isW);
+	if(CCD[set_index][lineaddr].state==S){
+		assert(!isW);
+		cach.entries[set_index][insert_i].cstate=S;
+	}
 
+	if(CCD[set_index][lineaddr].state != cach.entries[set_index][insert_i].cstate){
+		cout<<"CCD state: "<<CCD[set_index][lineaddr].state<<", cache cstate: "<<cach.entries[set_index][insert_i].cstate<<endl;
+	}
+	assert(CCD[set_index][lineaddr].state == cach.entries[set_index][insert_i].cstate);
     return 0;
 }
 
@@ -192,8 +373,8 @@ int read_8B_line(uint64_t * buf_val, char* buffer, FILE* fptr){
 }
 
 void log_cur_stats(){
-	cout<<"Total Accesses	:"<<simstats.total_m_insts<<endl;
-	cout<<"LLC hits			:"<<simstats.llc_hits<<endl;
+	cout<<"Total Access		:"<<simstats.total_m_insts<<endl;
+	cout<<"LLC hits__		:"<<simstats.llc_hits<<endl;
 	cout<<"LLC misses		:"<<simstats.llc_misses<<endl;
 	cout<<"Mem Reads		:"<<simstats.m_reads<<endl;
 	cout<<"Mem Writes		:"<<simstats.m_writes<<endl;
@@ -201,8 +382,8 @@ void log_cur_stats(){
 	cout<<"C Block Transfer	:"<<simstats.c_block_trans<<endl;
 	cout<<endl;
 
-	output_log<<"Total Accesses	:"<<simstats.total_m_insts<<endl;
-	output_log<<"LLC hits			:"<<simstats.llc_hits<<endl;
+	output_log<<"Total Access		:"<<simstats.total_m_insts<<endl;
+	output_log<<"LLC hits__		:"<<simstats.llc_hits<<endl;
 	output_log<<"LLC misses		:"<<simstats.llc_misses<<endl;
 	output_log<<"Mem Reads		:"<<simstats.m_reads<<endl;
 	output_log<<"Mem Writes		:"<<simstats.m_writes<<endl;
@@ -211,46 +392,6 @@ void log_cur_stats(){
 	output_log<<endl;
 }
 
-int log_misc_stats(U64 memory_touched_inMB, U64 total_num_accs_0, U64 sumallacc, U64 migrated_pages,
-	U64 migrated_pages_CI, U64 pages_to_CI, U64 CXI_count, ofstream& misc_log_full){
-	// cout<<"total memory touched in this phase: "<<(memory_touched_inMB)<<"MB"<<endl;
-	// cout<<"total number of accesses in  this phase by t0: "<<total_num_accs_0<<endl;
-	// cout<<"total number of accesses in  this phase by all t: "<<sumallacc<<endl;
-	
-	// cout<<"Baseline   migrations: "<<migrated_pages<<endl;
-	// cout<<"CXLisland  migrations: "<<(migrated_pages_CI+pages_to_CI)<<"("<<migrated_pages_CI<<" not counting pages to CI)"<<endl;
-	// cout<<"Migration to CXL_node: "<<pages_to_CI<<endl;	
-	// cout<<"Number of pages in CXL_node: "<<CXI_count<<endl;
-	// cout<<"size of data on CXL_node: "<<((CXI_count*4096)/1000000)<<"MB"<<endl;
-
-	// misc_log_full<<"total memory touched in this phase: "<<(memory_touched_inMB)<<"MB"<<endl;
-	// misc_log_full<<"total number of accesses in  this phase by t0: "<<total_num_accs_0<<endl;
-	// misc_log_full<<"total number of accesses in  this phase by all t: "<<sumallacc<<endl;
-	
-	// misc_log_full<<"Baseline   migrations: "<<migrated_pages<<endl;
-	// misc_log_full<<"CXLisland  migrations: "<<(migrated_pages_CI+pages_to_CI)<<"("<<migrated_pages_CI<<" not counting pages to CI)"<<endl;
-	// misc_log_full<<"Migration to CXL_node: "<<pages_to_CI<<endl;
-	// misc_log_full<<"Number of pages in CXL_node: "<<CXI_count<<endl;
-	// misc_log_full<<"size of data on CXL_node: "<<((CXI_count*4096)/1000000)<<"MB"<<endl;
-
-	// string phase_misc_log_name=generate_full_savefilename("phase_misc_log.txt");
-	// std::ofstream phase_misc_log(phase_misc_log_name);
-	// phase_misc_log<<"total memory touched in this phase: "<<(memory_touched_inMB)<<"MB"<<endl;
-	// phase_misc_log<<"total number of accesses in  this phase by t0: "<<total_num_accs_0<<endl;
-	// phase_misc_log<<"total number of accesses in  this phase by all t: "<<sumallacc<<endl;
-	
-	// phase_misc_log<<"Baseline   migrations: "<<migrated_pages<<endl;
-	// phase_misc_log<<"CXLisland  migrations: "<<(migrated_pages_CI+pages_to_CI)<<"("<<migrated_pages_CI<<" not counting pages to CI)"<<endl;
-	// phase_misc_log<<"Migration to CXL_node: "<<pages_to_CI<<endl;
-	// phase_misc_log<<"Number of pages in CXL_node: "<<CXI_count<<endl;
-	// phase_misc_log<<"size of data on CXL_node: "<<((CXI_count*4096)/1000000)<<"MB"<<endl;
-
-	// phase_misc_log.close();
-
-
-	return 0;
-
-}
 
 U64 gethop(U64 a, U64 b){
 	if(b==CXO){

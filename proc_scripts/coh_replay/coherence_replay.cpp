@@ -48,6 +48,9 @@ int main(){
 			cout<<"could not open "<<tfname.str()<<endl;
 		}
 	}
+    // print alignmnet DBG
+    // log_cur_stats(0);
+    // return 0;
 
     bool ts_6Bhit=false;
     //for(int j=0; j<100;j++){
@@ -63,7 +66,7 @@ int main(){
             if(buf_val==0xc0ffee){ // 1B inst phase done
 				read_8B_line(&buf_val, buffer, trace[i]);
                 if((buf_val>=TRACESTARTINST) && (i==2)){
-                    cout<<"timestampline : "<<buf_val<<endl;
+                    //cout<<"timestampline : "<<buf_val<<endl;
                     log_cur_stats(buf_val);
                 }
                 if(buf_val==6000000000){

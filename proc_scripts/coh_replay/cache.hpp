@@ -11,10 +11,10 @@
 #define CPU_CACHE_BLOCK_SIZE 6
 #define LINEBITS 6
 #define ULL unsigned long long
-//#define NUM_WAYS 16
-#define NUM_WAYS 24 //for including l2 - 1MB per core, 4MB per socket
-//#define NUM_SETS 32768 //32MB cache size
-#define NUM_SETS 8192 //8MB cache size 
+#define NUM_WAYS 16
+//#define NUM_WAYS 24 //for including l2 - 1MB per core, 4MB per socket
+#define NUM_SETS 32768 //32MB cache size
+//#define NUM_SETS 8192 //8MB cache size 
 
 //#define NUM_NODES 1
 

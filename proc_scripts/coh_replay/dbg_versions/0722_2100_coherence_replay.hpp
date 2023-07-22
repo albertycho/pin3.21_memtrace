@@ -76,7 +76,7 @@ uint64_t syscycle;
 unordered_map<uint64_t, DirectoryEntry> CCD[NUM_SETS]={}; //split into sets for quicker indexing?
 cache_t caches[N_SOCKETS];
 sim_stats_t simstats={0};
-std::ofstream output_log("coh_repl32M_log.txt");
+std::ofstream output_log("coh_repl12M_log_dbg.txt");
 
 
 //DBG vars
@@ -115,6 +115,49 @@ void init_caches(){
 void update_directory(uint64_t socket_id, uint64_t lineaddr, uint64_t set_index, bool isW){
 	DirectoryEntry &de = CCD[set_index][lineaddr];
 
+
+
+	if(set_index==dbg_setindex && lineaddr==dbg_lineaddr){
+		cout<<"requestor "<<socket_id<<", owner: "<<de.owner<<", ";
+		if(isW){cout<<"Write, ";}
+		else{cout<<"Read, ";}
+		cout<<"directory state ";
+		switch(de.state){
+			case I:
+				cout<<"I"<<endl;
+				break;
+			case S:
+				cout<<"S"<<endl;
+				break;
+			case E:
+				cout<<"E"<<endl;
+				break;
+			case M:
+				cout<<"M"<<endl;
+				break;
+			default:
+				assert(0); //code should not get here
+		}
+	}
+
+	// cout<<"directory state ";
+	// switch(de.state){
+	// 	case I:
+	// 		cout<<"I"<<endl;
+	// 		break;
+	// 	case S:
+	// 		cout<<"S"<<endl;
+	// 		break;
+	// 	case E:
+	// 		cout<<"E"<<endl;
+	// 		break;
+	// 	case M:
+	// 		cout<<"M"<<endl;
+	// 		break;
+	// 	default:
+	// 		assert(0); //code should not get here
+	// }
+
 	if(!isW){ //READS
 		switch(de.state){
 			case I:
@@ -136,12 +179,22 @@ void update_directory(uint64_t socket_id, uint64_t lineaddr, uint64_t set_index,
 					de.state=S;
 					for(int jj=0; jj<NUM_WAYS;jj++){
 						if((caches[de.owner].entries[set_index][jj].tag)==lineaddr && (caches[de.owner].entries[set_index][jj].valid) ){
+							///DBG PRINT
+							if(caches[de.owner].entries[set_index][jj].cstate!=E){
+								cout<<"requestorID: "<<socket_id<<"ownerID: "<<de.owner<<", set_index: "<<set_index<<", lineaddr: "<<lineaddr<<", wayID: "<<jj;
+								cout<<", owner cacheline cstate: ";
+								print_MESI(caches[de.owner].entries[set_index][jj].cstate);
+								cout<<", minscount: "<<simstats.total_m_insts<<endl;
+								cout<<"is valid?: "<<caches[de.owner].entries[set_index][jj].valid <<endl;
+								
+							}
 							assert(caches[de.owner].entries[set_index][jj].cstate==E);
 							assert(caches[de.owner].entries[set_index][jj].dirty==false);
 							caches[de.owner].entries[set_index][jj].cstate=S;
 							break;
 						}
 					}
+
 					simstats.c_block_trans++;
 				}
 
@@ -264,9 +317,16 @@ uint64_t access_cache(cache_t& cach, uint64_t lineaddr, bool isW, uint64_t ts, u
     //uint64_t lineaddr = addr>>LINEBITS;
 	uint64_t set_index = lineaddr & (NUM_SETS-1); //only works if NUM_SETS is power of 2
     //uint64_t set_index_dbg = lineaddr % NUM_SETS;
-    //assert(set_index==set_index_dbg);
+    //std::cout<<"set_i    :"<<set_index<<std::endl;
+    //std::cout<<"set_i_dbg:"<<set_index_dbg<<std::endl;
 
+	///DBG PRINT
+	if(set_index==dbg_setindex && lineaddr==dbg_lineaddr){
+		cout<<"acces_cache - socketid: "<<socketid<<", ";
+		print_RW(isW);
+		cout<<endl;
 
+	}
 
 
 	simstats.total_m_insts++;
@@ -279,7 +339,7 @@ uint64_t access_cache(cache_t& cach, uint64_t lineaddr, bool isW, uint64_t ts, u
     //find lru
     uint64_t lru_ts = ~0;
     uint64_t lru_i = 0;
-    //assert(999999999999<lru_ts); //dbg
+    assert(999999999999<lru_ts); //dbg
 
     //TODO check for hit first!
     for(int j=0; j<NUM_WAYS;j++){
@@ -325,11 +385,27 @@ uint64_t access_cache(cache_t& cach, uint64_t lineaddr, bool isW, uint64_t ts, u
 		uint64_t evicted_lineaddr = cach.entries[set_index][lru_i].tag;
 		DirectoryEntry &ede = CCD[set_index][evicted_lineaddr];
 
+		//DBG PRINT
+		if(set_index==dbg_setindex && evicted_lineaddr==dbg_lineaddr){
+			cout<<"evicting debug line from socket: "<<socketid;
+			cout<<", wayID: "<<lru_i<<", line state: ";
+			print_MESI( cach.entries[set_index][lru_i].cstate);
+			cout<<", directory state: ";
+			print_MESI(ede.state);
+			cout<<", owner: "<<ede.owner<<endl;
+		}
 
 		if(cach.entries[set_index][lru_i].dirty==true){
 			//incrmenet mem_wr, set directory state to I, unset all sharers
 			//dbg
 			assert(cach.entries[set_index][lru_i].cstate==M);
+			if(ede.state!=M){
+				cout<<"evicting cache socket: "<<socketid<<endl;
+				cout<<"evicted line cache cstate: "<<cach.entries[set_index][lru_i].cstate<<endl;
+				cout<<"evicted lineaddr: "<<evicted_lineaddr<<", set_index: "<<set_index<<endl;
+				cout<<"evicted way index: "<<lru_i<<", access_count: "<<simstats.total_m_insts<<endl;
+				cout<<"\nevicted line Directory state: "<<ede.state<<endl;
+			}
 			assert(ede.state==M);
 			assert(ede.owner==socketid);
 
@@ -356,11 +432,22 @@ uint64_t access_cache(cache_t& cach, uint64_t lineaddr, bool isW, uint64_t ts, u
 						if(jj!=socketid){ede.owner=jj;}
 					}
 				}
+				//DBG PRINT
+				if(set_index==dbg_setindex && evicted_lineaddr==dbg_lineaddr && socketid==0){
+					cout<<"NUMSHARERS: "<<numsharers<<", new onwer: "<<ede.owner<<endl;
+				}
 				assert(ede.owner!=socketid); // should have at least one other node if in S
 				if(numsharers==1){
 					ede.state=E;
+					if(set_index==dbg_setindex && evicted_lineaddr==dbg_lineaddr && socketid==0){
+						cout<<"code gets here line 438, minscount: "<<simstats.total_m_insts<<endl;
+					}
 					for(int ii=0; ii<NUM_WAYS;ii++){
 						if((caches[ede.owner].entries[set_index][ii].tag==evicted_lineaddr) && (caches[ede.owner].entries[set_index][ii].valid)){
+							if(set_index==dbg_setindex && evicted_lineaddr==dbg_lineaddr && socketid==0){
+								cout<<"code gets here line 443, wayID: "<<ii<<endl;
+								cout<<"isvalid?: "<<caches[ede.owner].entries[set_index][ii].valid<<endl;
+							}
 							caches[ede.owner].entries[set_index][ii].cstate=E;
 							break;
 						}
@@ -390,6 +477,13 @@ uint64_t access_cache(cache_t& cach, uint64_t lineaddr, bool isW, uint64_t ts, u
 		cach.entries[set_index][insert_i].cstate=S;
 	}
 
+	if(CCD[set_index][lineaddr].state != cach.entries[set_index][insert_i].cstate){
+		cout<<"CCD state: "<<CCD[set_index][lineaddr].state<<", cache cstate: "<<cach.entries[set_index][insert_i].cstate<<endl;
+		cout<<"AccessID: "<<simstats.total_m_insts<<endl;
+		cout<<"set_index: "<<set_index<<", lineaddr: "<<lineaddr<<endl;
+		if(isW){cout<<"Write"<<endl;}
+		else{cout<<"Read"<<endl;}
+	}
 	assert(CCD[set_index][lineaddr].state == cach.entries[set_index][insert_i].cstate);
 
 	//dbg

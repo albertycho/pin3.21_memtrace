@@ -79,12 +79,6 @@ sim_stats_t simstats={0};
 std::ofstream output_log("coh_repl32M_log.txt");
 
 
-//DBG vars
-uint64_t dbg_setindex=7071;
-uint64_t dbg_lineaddr=2181359090591;
-
-void print_MESI(DState dstate);
-void print_RW(bool isW);
 ///cache functions
 
 void init_caches(){
@@ -94,7 +88,6 @@ void init_caches(){
 			for(int k=0; k<NUM_WAYS;k++){
 				caches[i].entries[j][k].valid=false;
 				caches[i].entries[j][k].dirty=false;
-				caches[i].entries[j][k].tag=~0;
 				caches[i].entries[j][k].cstate=coh_state_t::I;
 				caches[i].entries[j][k].ts=0;
 
@@ -114,6 +107,24 @@ void init_caches(){
 
 void update_directory(uint64_t socket_id, uint64_t lineaddr, uint64_t set_index, bool isW){
 	DirectoryEntry &de = CCD[set_index][lineaddr];
+
+	// cout<<"directory state ";
+	// switch(de.state){
+	// 	case I:
+	// 		cout<<"I"<<endl;
+	// 		break;
+	// 	case S:
+	// 		cout<<"S"<<endl;
+	// 		break;
+	// 	case E:
+	// 		cout<<"E"<<endl;
+	// 		break;
+	// 	case M:
+	// 		cout<<"M"<<endl;
+	// 		break;
+	// 	default:
+	// 		assert(0); //code should not get here
+	// }
 
 	if(!isW){ //READS
 		switch(de.state){
@@ -135,13 +146,14 @@ void update_directory(uint64_t socket_id, uint64_t lineaddr, uint64_t set_index,
 					assert(de.sharers[socket_id]==false);
 					de.state=S;
 					for(int jj=0; jj<NUM_WAYS;jj++){
-						if((caches[de.owner].entries[set_index][jj].tag)==lineaddr && (caches[de.owner].entries[set_index][jj].valid) ){
+						if(caches[de.owner].entries[set_index][jj].tag==lineaddr){
 							assert(caches[de.owner].entries[set_index][jj].cstate==E);
 							assert(caches[de.owner].entries[set_index][jj].dirty==false);
 							caches[de.owner].entries[set_index][jj].cstate=S;
 							break;
 						}
 					}
+
 					simstats.c_block_trans++;
 				}
 
@@ -156,7 +168,7 @@ void update_directory(uint64_t socket_id, uint64_t lineaddr, uint64_t set_index,
 					assert(de.sharers[socket_id]==false);
 					de.state=S;
 					for(int jj=0; jj<NUM_WAYS;jj++){
-						if(caches[de.owner].entries[set_index][jj].tag==lineaddr && (caches[de.owner].entries[set_index][jj].valid)){
+						if(caches[de.owner].entries[set_index][jj].tag==lineaddr){
 							assert(caches[de.owner].entries[set_index][jj].cstate==M);
 							assert(caches[de.owner].entries[set_index][jj].dirty);
 							caches[de.owner].entries[set_index][jj].cstate=S;
@@ -190,11 +202,10 @@ void update_directory(uint64_t socket_id, uint64_t lineaddr, uint64_t set_index,
 						if(de.sharers[jj]){
 							de.sharers[jj]=false;
 							for(int ii=0;ii<NUM_WAYS;ii++){
-								if((caches[jj].entries[set_index][ii].tag)==lineaddr && (caches[jj].entries[set_index][ii].valid)){
+								if(caches[jj].entries[set_index][ii].tag==lineaddr){
 									caches[jj].entries[set_index][ii].cstate=I;
 									caches[jj].entries[set_index][ii].valid=false;
 									caches[jj].entries[set_index][ii].dirty=false;
-									caches[jj].entries[set_index][ii].tag=~0;
 									break;
 								}							
 							}
@@ -211,13 +222,12 @@ void update_directory(uint64_t socket_id, uint64_t lineaddr, uint64_t set_index,
 					assert(de.sharers[socket_id]==false);
 					de.sharers[de.owner]=false;
 					for(int ii=0;ii<NUM_WAYS;ii++){
-						if((caches[de.owner].entries[set_index][ii].tag==lineaddr) && (caches[de.owner].entries[set_index][ii].valid)){
+						if(caches[de.owner].entries[set_index][ii].tag==lineaddr){
 							assert(caches[de.owner].entries[set_index][ii].cstate==E);
 							assert(caches[de.owner].entries[set_index][ii].dirty==false);
 							caches[de.owner].entries[set_index][ii].cstate=I;
 							caches[de.owner].entries[set_index][ii].valid=false;
 							caches[de.owner].entries[set_index][ii].dirty=false;
-							caches[de.owner].entries[set_index][ii].tag=~0;
 							break;
 						}							
 					}
@@ -233,13 +243,12 @@ void update_directory(uint64_t socket_id, uint64_t lineaddr, uint64_t set_index,
 					assert(de.sharers[socket_id]==false);
 					de.sharers[de.owner]=false;
 					for(int ii=0;ii<NUM_WAYS;ii++){
-						if((caches[de.owner].entries[set_index][ii].tag==lineaddr) && (caches[de.owner].entries[set_index][ii].valid)){
+						if(caches[de.owner].entries[set_index][ii].tag==lineaddr){
 							assert(caches[de.owner].entries[set_index][ii].cstate==M);
 							assert(caches[de.owner].entries[set_index][ii].dirty);
 							caches[de.owner].entries[set_index][ii].cstate=I;
 							caches[de.owner].entries[set_index][ii].valid=false;
 							caches[de.owner].entries[set_index][ii].dirty=false;
-							caches[de.owner].entries[set_index][ii].tag=~0;
 							break;
 						}							
 					}
@@ -264,10 +273,8 @@ uint64_t access_cache(cache_t& cach, uint64_t lineaddr, bool isW, uint64_t ts, u
     //uint64_t lineaddr = addr>>LINEBITS;
 	uint64_t set_index = lineaddr & (NUM_SETS-1); //only works if NUM_SETS is power of 2
     //uint64_t set_index_dbg = lineaddr % NUM_SETS;
-    //assert(set_index==set_index_dbg);
-
-
-
+    //std::cout<<"set_i    :"<<set_index<<std::endl;
+    //std::cout<<"set_i_dbg:"<<set_index_dbg<<std::endl;
 
 	simstats.total_m_insts++;
     //find hit
@@ -279,7 +286,7 @@ uint64_t access_cache(cache_t& cach, uint64_t lineaddr, bool isW, uint64_t ts, u
     //find lru
     uint64_t lru_ts = ~0;
     uint64_t lru_i = 0;
-    //assert(999999999999<lru_ts); //dbg
+    assert(999999999999<lru_ts); //dbg
 
     //TODO check for hit first!
     for(int j=0; j<NUM_WAYS;j++){
@@ -325,11 +332,17 @@ uint64_t access_cache(cache_t& cach, uint64_t lineaddr, bool isW, uint64_t ts, u
 		uint64_t evicted_lineaddr = cach.entries[set_index][lru_i].tag;
 		DirectoryEntry &ede = CCD[set_index][evicted_lineaddr];
 
-
 		if(cach.entries[set_index][lru_i].dirty==true){
 			//incrmenet mem_wr, set directory state to I, unset all sharers
 			//dbg
 			assert(cach.entries[set_index][lru_i].cstate==M);
+			if(ede.state!=M){
+				cout<<"evicting cache socket: "<<socketid<<endl;
+				cout<<"evicted line cache cstate: "<<cach.entries[set_index][lru_i].cstate<<endl;
+				cout<<"evicted lineaddr: "<<evicted_lineaddr<<", set_index: "<<set_index<<endl;
+				cout<<"evicted way index: "<<lru_i<<", access_count: "<<simstats.total_m_insts<<endl;
+				cout<<"\nevicted line Directory state: "<<ede.state<<endl;
+			}
 			assert(ede.state==M);
 			assert(ede.owner==socketid);
 
@@ -347,6 +360,7 @@ uint64_t access_cache(cache_t& cach, uint64_t lineaddr, bool isW, uint64_t ts, u
 				ede.state=I;
 			}
 			else{
+				//dbg
 				assert(ede.state==S);
 				ede.sharers[socketid]=false;
 				uint64_t numsharers=0;
@@ -360,7 +374,7 @@ uint64_t access_cache(cache_t& cach, uint64_t lineaddr, bool isW, uint64_t ts, u
 				if(numsharers==1){
 					ede.state=E;
 					for(int ii=0; ii<NUM_WAYS;ii++){
-						if((caches[ede.owner].entries[set_index][ii].tag==evicted_lineaddr) && (caches[ede.owner].entries[set_index][ii].valid)){
+						if(caches[ede.owner].entries[set_index][ii].tag==evicted_lineaddr){
 							caches[ede.owner].entries[set_index][ii].cstate=E;
 							break;
 						}
@@ -390,6 +404,13 @@ uint64_t access_cache(cache_t& cach, uint64_t lineaddr, bool isW, uint64_t ts, u
 		cach.entries[set_index][insert_i].cstate=S;
 	}
 
+	if(CCD[set_index][lineaddr].state != cach.entries[set_index][insert_i].cstate){
+		cout<<"CCD state: "<<CCD[set_index][lineaddr].state<<", cache cstate: "<<cach.entries[set_index][insert_i].cstate<<endl;
+		cout<<"AccessID: "<<simstats.total_m_insts<<endl;
+		cout<<"set_index: "<<set_index<<", lineaddr: "<<lineaddr<<endl;
+		if(isW){cout<<"Write"<<endl;}
+		else{cout<<"Read"<<endl;}
+	}
 	assert(CCD[set_index][lineaddr].state == cach.entries[set_index][insert_i].cstate);
 
 	//dbg

@@ -1,2 +1,3 @@
-g++ omp_pp_trace.cpp -O3 -o omp_pp_trace -fopenmp
+g++ -Wall omp_pp_trace.cpp -O3 -fopenmp  -o omp_pp_trace
 g++ coherence_replay.cpp -O3 -o coherence_replay
+

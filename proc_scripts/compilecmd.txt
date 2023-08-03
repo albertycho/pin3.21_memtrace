@@ -1,3 +1,3 @@
 g++ -Wall omp_pp_trace.cpp -O3 -fopenmp  -o omp_pp_trace
 g++ coherence_replay.cpp -O3 -o coherence_replay
-
+g++ regenerate_page_maps.cpp -O3 -Wall -std=c++17  -o regenerate_page_maps_dbg

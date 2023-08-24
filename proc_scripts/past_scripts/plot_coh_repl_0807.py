@@ -19,21 +19,10 @@ df.set_index('APP', inplace=True)
 #        df[column] = df[column] / df['Mem_R_12M']
 #df['Mem_R_12M']=1
 
-#norm_val = df['Mem_R_12M'] + df['Mem_W_12M']
-norm_val = df['Mem_R_12M'] + df['Mem_W_12M']+df['Coh_Invals_12M']+df['Coh_Block_Transfer_12M']
-dec_ratio_in32M = (df['Mem_R_32M'] + df['Mem_W_32M']+df['Coh_Invals_32M']+df['Coh_Block_Transfer_32M']) / norm_val
-print(dec_ratio_in32M)
-cache_action_ratio =  ( df['Coh_Invals_12M']+df['Coh_Block_Transfer_12M'] ) / norm_val
-print(cache_action_ratio)
-armean = np.mean(cache_action_ratio)
-print(armean)
-
+norm_val = df['Mem_R_12M'] + df['Mem_W_12M']
 for column in df.columns:
     #if not 'Mem_R_12M' in column:
     df[column] = df[column] / norm_val
-
-
-
 #df['Mem_R_12M']=1
 
 
@@ -49,15 +38,15 @@ color_cb='tab:orange'#'red'
 fig, ax = plt.subplots(figsize=(10,4))
 fs=14
 plt.rcParams['font.size'] = fs
-barw=0.3
+barw=0.2
 
 # Create a bar plot for 12M data
-df_12M[['Mem_R_12M', 'Mem_W_12M', 'Coh_Invals_12M', 'Coh_Block_Transfer_12M']].plot.bar(stacked=True, position=1, width=barw, ax=ax, color=[color_mr,color_mw, color_ci, color_cb], align='center', label=['Mem_R', 'Mem_W','C_invals','C_block_Transfer'])#, edgecolor='black')
-#df_12M[['Coh_Invals_12M', 'Coh_Block_Transfer_12M']].plot.bar(stacked=True, position=1, width=barw, ax=ax, color=[color_ci,color_cb], align='center')
+df_12M[['Mem_R_12M', 'Mem_W_12M']].plot.bar(stacked=True, position=2, width=barw, ax=ax, color=[color_mr,color_mw], align='center', label=['Mem_R', 'Mem_W'])#, edgecolor='black')
+df_12M[['Coh_Invals_12M', 'Coh_Block_Transfer_12M']].plot.bar(stacked=True, position=1, width=barw, ax=ax, color=[color_ci,color_cb], align='center')
 
 # Create a bar plot for 32M data
-df_32M[['Mem_R_32M', 'Mem_W_32M', 'Coh_Invals_32M', 'Coh_Block_Transfer_32M']].plot.bar(stacked=True, position=0, width=barw, ax=ax, color=[color_mr,color_mw, color_ci, color_cb], align='center', hatch='//', alpha=0.7)
-#df_32M[['Coh_Invals_32M', 'Coh_Block_Transfer_32M']].plot.bar(stacked=True, position=-1, width=barw, ax=ax, color=[color_ci,color_cb], align='center', hatch='//', alpha=0.7)
+df_32M[['Mem_R_32M', 'Mem_W_32M']].plot.bar(stacked=True, position=0, width=barw, ax=ax, color=[color_mr,color_mw], align='center', hatch='//', alpha=0.7)
+df_32M[['Coh_Invals_32M', 'Coh_Block_Transfer_32M']].plot.bar(stacked=True, position=-1, width=barw, ax=ax, color=[color_ci,color_cb], align='center', hatch='//', alpha=0.7)
 
 
 # Custom Legend

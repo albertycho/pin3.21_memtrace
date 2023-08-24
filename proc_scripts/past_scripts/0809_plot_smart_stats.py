@@ -23,7 +23,7 @@ with open('collected_smart_stats.csv', 'r') as csvfile:
 
 # Calculate the geometric mean for normalized IPCs
 geomean_normalized_IPCs = gmean(normalized_IPCs)
-benchmarks.append('MEAN')
+benchmarks.append('Mean')
 normalized_IPCs.append(geomean_normalized_IPCs)
 
 # Calculate the arithmetic mean for AMATs
@@ -48,7 +48,7 @@ plt.gca().set_axisbelow(True)  # Set grid behind
 #plt.xlabel('Benchmark')
 plt.ylabel('Normalized IPC', fontsize=labelfontsize)
 # Add annotation for geometric mean
-mean_x_position = benchmarks.index('MEAN')
+mean_x_position = benchmarks.index('Mean')
 plt.text(mean_x_position, geomean_normalized_IPCs + 0.02, f'{geomean_normalized_IPCs:.2f}', ha='center')
 #plt.title('Normalized IPC for each benchmark')
 #plt.xticks(rotation=90)

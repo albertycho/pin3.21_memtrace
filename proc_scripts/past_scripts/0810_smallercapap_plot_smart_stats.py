@@ -53,8 +53,8 @@ plt.text(mean_x_position, geomean_normalized_IPCs + 0.02, f'{geomean_normalized_
 #plt.title('Normalized IPC for each benchmark')
 #plt.xticks(rotation=90)
 #plt.show()
-plt.savefig('main_IPC.png', bbox_inches='tight')
-plt.savefig('main_IPC.pdf', bbox_inches='tight')
+plt.savefig('smallpool_IPC.png', bbox_inches='tight')
+plt.savefig('smallpool_IPC.pdf', bbox_inches='tight')
 
 # Plot AMATs
 plt.figure(figsize=(10, 4))
@@ -73,8 +73,8 @@ plt.xticks([i + bar_width / 2 for i in index], benchmarks)
 #plt.xticks([i + bar_width / 2 for i in index], benchmarks, rotation=90)
 plt.legend()
 #plt.show()
-plt.savefig('main_eval_AMAT.png', bbox_inches='tight')
-plt.savefig('main_evalAMAT.pdf', bbox_inches='tight')
+plt.savefig('smallpool_AMAT.png', bbox_inches='tight')
+plt.savefig('smallpool.pdf', bbox_inches='tight')
 
 
 

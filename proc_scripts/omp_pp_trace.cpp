@@ -36,7 +36,7 @@
 
 #define LIMIT_MIGRATION 1
 //#define MIGRATION_LIMIT 12288
-#define MIGRATION_LIMIT 32768
+
 
 using namespace std;
 
@@ -178,7 +178,7 @@ int process_phase(){
 
 			//not doing anything with ins count in this script for now
 			//just read and discard
-			U64 icount_val;
+			U64 icount_val=0;
 			read_8B_line(&icount_val, buffer, trace[i]);
 			//cout<<"page: "<<page<<" icount: "<<icount_val<<endl;
 			if(icount_val>=phase_end_cycle){
@@ -504,7 +504,7 @@ int process_phase(){
 	// Reassign owners
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	if(LIMIT_MIGRATION){
-		uint64_t pool_cap = (page_owner_CI.size())/5;
+		uint64_t pool_cap = (page_owner_CI.size())/POOL_FRACTION;
 		auto it_migration = sorted_candidates.begin();
 		//for(int i=0;i<MIGRATION_LIMIT;i++){
 		uint64_t i=0;
@@ -516,10 +516,32 @@ int process_phase(){
 			U64 page  = it_migration->first;
 			U64 most_acc=0;
 			U64 new_owner=INVAL_OWNER;
-			for(U64 j=0; j<N_SOCKETS;j++){
-				if(page_access_counts_consol[j][page]>most_acc){
-					most_acc = page_access_counts[j][page];
-					new_owner=j;
+			U64 sharers = page_sharers_long[page];
+			//TODO assign random owner among sharers for pages with +8 sharers
+			if(sharers>=8){
+				uint64_t tmp_i = rand()%sharers;
+				//dbg
+				//cout<<"sharers: "<<sharers <<", tmp_i: "<<tmp_i<<endl;
+				////
+				U64 tmp_j=0;
+				new_owner=0;
+				for(U64 j=0; j<N_SOCKETS;j++){
+					if(page_access_counts_consol[j][page]>0){
+						if(tmp_j==tmp_i){
+							new_owner = j;
+							break;
+						}
+						tmp_j++;
+					}
+				}
+				//cout<<"new owner: "<<new_owner<<endl;
+			}
+			else{
+				for(U64 j=0; j<N_SOCKETS;j++){
+					if(page_access_counts_consol[j][page]>most_acc){
+						most_acc = page_access_counts[j][page];
+						new_owner=j;
+					}
 				}
 			}
 			if(i<MIGRATION_LIMIT){ // baseline
@@ -538,8 +560,8 @@ int process_phase(){
 				}
 			}
 			if(i_cxi<MIGRATION_LIMIT){ // cxl-island
-				U64 sharers = page_sharers_long[page];
-				U64 old_owner = page_owner_CI[page];
+				//U64 sharers = page_sharers_long[page];
+				//U64 old_owner = page_owner_CI[page];
 				if (migration_per_page_CI[page] <= (curphase/4)) {
 					if (sharers >= SHARER_THRESHOLD) {
 
@@ -564,10 +586,30 @@ int process_phase(){
 								if(it==sorted_candidates.rend()) cout<<"WARNING: needed to find eviction candidate from pool but didn't find"<<endl;
 								U64 ev_most_acc=0;
 								U64 ev_new_owner=rand() % N_SOCKETS;
-								for(U64 j=0; j<N_SOCKETS;j++){
-									if(page_access_counts_consol[j][evicted_page]>ev_most_acc){
-										ev_most_acc = page_access_counts[j][evicted_page];
-										ev_new_owner=j;
+								U64 ev_sharers = page_sharers_long[evicted_page];
+								if(ev_sharers>=8){
+									uint64_t tmp_i = rand()%sharers;
+									//dbg
+									//std::cout<<"ev_sharers: "<<ev_sharers <<", tmp_i: "<<tmp_i<<endl;
+									////
+									U64 tmp_j=0;
+									for(U64 j=0; j<N_SOCKETS;j++){
+										if(page_access_counts_consol[j][evicted_page]>1){
+											if(tmp_j==tmp_i){
+												ev_new_owner = j;
+												break;
+											}
+											tmp_j++;
+										}
+									}
+									//cout<<"ev_new_owner: "<<ev_new_owner<<endl;									
+								}
+								else{
+									for(U64 j=0; j<N_SOCKETS;j++){
+										if(page_access_counts_consol[j][evicted_page]>ev_most_acc){
+											ev_most_acc = page_access_counts[j][evicted_page];
+											ev_new_owner=j;
+										}
 									}
 								}
 

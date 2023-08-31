@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <cassert>
 #include <chrono>
+
 #include <cmath>
 #include <queue>
 #include <stack>
@@ -20,7 +21,7 @@
 #include <omp.h>
 #include <sys/stat.h> 
 #include <sys/types.h> 
-#include "omp_pp_trace.hpp"
+#include "page_map_generator.hpp"
 
 // #define PAGESIZE 4096
 // #define PAGEBITS 12
@@ -46,8 +47,6 @@ omp_lock_t page_W_lock;
 omp_lock_t page_R_lock;
 omp_lock_t page_owner_lock;
 omp_lock_t page_owner_CI_lock;
-omp_lock_t hop_hist_lock;
-omp_lock_t hop_hist_CI_lock;
 
 vector<unordered_map<uint64_t, uint64_t>> page_access_counts_dummy;
 // vector<unordered_map<uint64_t, uint64_t>> page_access_counts_R(N_THR);
@@ -101,41 +100,15 @@ int process_phase(){
 	unordered_map<uint64_t, uint64_t> page_Ws={};
 
 	std::multiset<std::pair<uint64_t, uint64_t>, migration_compare> sorted_candidates;
-
-	// list of links (track traffic per link)
-	U64 link_traffic_R[N_SOCKETS][N_SOCKETS]={0};
-	U64 link_traffic_W[N_SOCKETS][N_SOCKETS]={0};
-	U64 link_traffic_R_CI[N_SOCKETS][N_SOCKETS]={0};
-	U64 link_traffic_W_CI[N_SOCKETS][N_SOCKETS]={0};
-	U64	CI_traffic_R[N_SOCKETS]={0};
-	U64	CI_traffic_W[N_SOCKETS]={0};
-
-	// traffic at memory controller on each ndoe
-	U64 mem_traffic[N_SOCKETS]={0};
-	U64 mem_traffic_CI[N_SOCKETS]={0};
 	
 	U64 migrated_pages=0;
 	U64 migrated_pages_CI=0;
 	U64 pages_to_CI=0;
 
-	//Histograms
-	uint64_t hist_access_sharers[N_SOCKETS_OFFSET]={0};
-	uint64_t hist_access_sharers_R[N_SOCKETS_OFFSET]={0};
-	uint64_t hist_access_sharers_R_to_RWP[N_SOCKETS_OFFSET]={0};
-	uint64_t hist_access_sharers_W[N_SOCKETS_OFFSET]={0};
-	uint64_t hist_page_sharers[N_SOCKETS_OFFSET]={0};
-	uint64_t hist_page_sharers_R[N_SOCKETS_OFFSET]={0};
-	uint64_t hist_page_sharers_W[N_SOCKETS_OFFSET]={0};
-	uint64_t hist_page_shareres_nacc[10][N_SOCKETS_OFFSET]={0};
-
-	uint64_t hop_hist_W[N_SOCKETS_OFFSET][4]={0};
-	uint64_t hop_hist_RtoRW[N_SOCKETS_OFFSET][4]={0};
-	uint64_t hop_hist_RO[N_SOCKETS_OFFSET][4]={0};
-	uint64_t hop_hist_W_CI[N_SOCKETS_OFFSET][4]={0};
-	uint64_t hop_hist_RtoRW_CI[N_SOCKETS_OFFSET][4]={0};
-	uint64_t hop_hist_RO_CI[N_SOCKETS_OFFSET][4]={0};
 
 	U64 total_num_accs[N_THR]={0};
+
+	auto read_start = std::chrono::high_resolution_clock::now();
 
 	#pragma omp parallel for
 	for (int i=0; i<N_THR;i++){
@@ -255,6 +228,11 @@ int process_phase(){
 
 	}
 	
+	auto read_end = std::chrono::high_resolution_clock::now();
+
+	std::chrono::duration<double> elapsed1 = read_end - read_start;
+    std::cout << "Time taken for trace read: " << elapsed1.count() << " seconds\n";
+
 	//consoliate page_access_counts per thread into per socket
 	for(uint64_t ii=0; ii<N_THR; ii++){
 		uint64_t socketid = ii>>2; //4 cores per socket
@@ -268,7 +246,6 @@ int process_phase(){
 			page_access_counts_R[socketid][pt.first]=page_access_counts_R[socketid][pt.first]+pt.second;
 		}
 	}
-
 
 	//update access data from past 1 billion instructions
 	page_access_counts_history.push_back(page_access_counts);
@@ -284,6 +261,11 @@ int process_phase(){
 		page_Rs_history.erase(page_Rs_history.begin());
 		page_Ws_history.erase(page_Ws_history.begin());
 	}
+
+	auto consol_end = std::chrono::high_resolution_clock::now();
+
+	std::chrono::duration<double> elapsed2 = consol_end - read_end;
+    std::cout << "Time taken for trace consol: " << elapsed2.count() << " seconds\n";
 
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// log sharers for each page for the past 1 Billion insts
@@ -331,17 +313,23 @@ int process_phase(){
 			assert(page_sharers_long[page] < N_SOCKETS+1);
 		}
 	}
+	
+	auto sharer_consol_end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsed3 = sharer_consol_end - consol_end;
+    std::cout << "Time taken for sharer consol: " << elapsed3.count() << " seconds\n";
 
-	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	// log sharers for each page for this phase
-	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	for (const auto& pa_c : page_access_counts) {
-		for (const auto& ppair : pa_c) {
-			U64 page = ppair.first;
-			page_sharers[page]=page_sharers[page]+1;
-			assert(page_sharers[page] < N_SOCKETS+1);
-		}
-	}
+
+	// //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	// // log sharers for each page for this phase
+	// //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	// for (const auto& pa_c : page_access_counts) {
+	// 	for (const auto& ppair : pa_c) {
+	// 		U64 page = ppair.first;
+	// 		page_sharers[page]=page_sharers[page]+1;
+	// 		assert(page_sharers[page] < N_SOCKETS+1);
+	// 	}
+	// }
+	
 	
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// sort pages in order of accesses in sorted_candidates
@@ -356,133 +344,55 @@ int process_phase(){
 			sorted_candidates.insert({page, accs});
 		//}
 	}
-	//cout<<"sorted candidates size: "<<sorted_candidates.size()<<endl;
+	cout<<"sorted candidates size: "<<sorted_candidates.size()<<endl;
+
+	auto sort_end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsed4 = sort_end - sharer_consol_end;
+    std::cout << "Time taken for sort: " << elapsed4.count() << " seconds\n";
+
 
 
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	// Populate access sharer histogram
+	// Populate owners for new pages
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	//dbg
-	cout<<"hist_access_sharers[0]: " <<hist_access_sharers[0]<<endl;
 	U64 pac_size = page_access_counts_consol.size();
 	assert(pac_size==N_SOCKETS);
-	for(U64 i=0; i<pac_size;i++){
-		auto pac   = page_access_counts_consol[i];
-		auto pac_W = page_access_counts_W_consol[i];
-		auto pac_R = page_access_counts_R_consol[i];
-		for (const auto& ppair : pac) {
-			U64 page = ppair.first;
-			U64 accs = ppair.second;
-			U64 rds= pac_R[page];
-			U64 wrs= pac_W[page];
-			//U64 sharers = page_sharers[page];
-			U64 sharers = page_sharers_long[page];
-			assert(sharers>0);
-			hist_access_sharers[sharers]=hist_access_sharers[sharers]+accs;
-			hist_access_sharers_W[sharers]=hist_access_sharers_W[sharers]+wrs;
-			if(page_Ws[page]!=0){
-				hist_access_sharers_R_to_RWP[sharers]=hist_access_sharers_R_to_RWP[sharers]+rds;
-			}
-			else{
-				hist_access_sharers_R[sharers]=hist_access_sharers_R[sharers]+rds;
-			}
 	
-			//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-			// Populate hop histogram
-			//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-			U64 owner=i;
-			auto pp_it = page_owner.find(page);
-			if(pp_it==page_owner.end()){ //new page first touch
-				// this will favor thread 0. 
-				// should be ok after the first phase..
-				unordered_map<uint64_t, uint64_t> pa_count;
-				vector<uint64_t> sharers = {};
-				uint64_t jj = 0;
-				for (const auto& pa_c : page_access_counts) {
-					if (pa_c.find(page) != pa_c.end()) {
-						sharers.push_back(jj);
-					}
-					jj++;
+	uint64_t new_pages=0;
+	for (const auto& ppair : page_sharers_long){
+		auto page = ppair.first;
+		auto pp_it = page_owner.find(page);
+		uint64_t owner=0;
+		if(pp_it==page_owner.end()){ //new page first touch
+			new_pages++;
+			// this will favor thread 0. 
+			// should be ok after the first phase..
+			unordered_map<uint64_t, uint64_t> pa_count;
+			vector<uint64_t> sharers = {};
+			uint64_t jj = 0;
+			for (const auto& pa_c : page_access_counts) {
+				if (pa_c.find(page) != pa_c.end()) {
+					sharers.push_back(jj);
 				}
-				uint64_t ri = rand() % sharers.size();
-				owner = sharers[ri];
-				page_owner[page]=owner; 
-				
+				jj++;
 			}
-			else{
-				owner=pp_it->second;
-			}
-			U64 hop = gethop(i,owner);
-			assert(hop<3);
-			//U64 sharers = page_sharers[page];
-			hop_hist_W[sharers][hop]=hop_hist_W[sharers][hop]+wrs;
-			if(page_Ws[page]!=0){
-				hop_hist_RtoRW[sharers][hop]=hop_hist_RtoRW[sharers][hop]+rds;
-			}
-			else{
-				hop_hist_RO[sharers][hop]=hop_hist_RO[sharers][hop]+rds;
-			}
-			link_traffic_R[i][owner]=link_traffic_R[i][owner]+rds;
-			link_traffic_W[i][owner]=link_traffic_W[i][owner]+wrs;
-			mem_traffic[i]=mem_traffic[i]+rds+wrs;
+			uint64_t ri = rand() % sharers.size();
+			owner = sharers[ri];
+			page_owner[page]=owner;
+			// if this is new page, wouldn't bei n page_owner_CI either
+			page_owner_CI[page]=owner;
 			
-			////@@@ repeat for CXL island @@@@@
-			U64 owner_CI=i;
-			auto pp_it_CI = page_owner_CI.find(page);
-			if(pp_it_CI==page_owner_CI.end()){
-				// this will favor thread 0. 
-				// should be ok after the first phase..
-				page_owner_CI[page]=i; 
-				owner_CI=i;
-			}
-			else{
-				owner_CI=pp_it_CI->second;
-			}
-			U64 hop_CI = gethop(i,owner_CI);
-			//U64 sharers_CI = page_sharers[page];
-			hop_hist_W_CI[sharers][hop_CI]=hop_hist_W_CI[sharers][hop_CI]+wrs;
-			if(page_Ws[page]!=0){
-				hop_hist_RtoRW_CI[sharers][hop_CI]=hop_hist_RtoRW_CI[sharers][hop_CI]+rds;
-			}
-			else{
-				hop_hist_RO_CI[sharers][hop_CI]=hop_hist_RO_CI[sharers][hop_CI]+rds;
-			}
-			if(owner_CI==CXO){
-				CI_traffic_R[i]=CI_traffic_R[i]+rds;
-				CI_traffic_W[i]=CI_traffic_W[i]+wrs;
-				
-			}
-			else{
-				link_traffic_R_CI[i][owner]=link_traffic_R_CI[i][owner]+rds;
-				link_traffic_W_CI[i][owner]=link_traffic_W_CI[i][owner]+wrs;
-				mem_traffic_CI[i]=mem_traffic_CI[i]+rds+wrs;
-			}
-
 		}
-	}	
-
-
-
-
-	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	// Populate page sharer histogram
-	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	//for (const auto& pss : page_sharers) {
-	for (const auto& pss : page_sharers_long) {
-		U64 sharers = pss.second;
-		U64 page = pss.first;
-		hist_page_sharers[sharers]=hist_page_sharers[sharers]+1;
-		if(page_Ws[page]!=0){
-			hist_page_sharers_W[sharers]=hist_page_sharers_W[sharers]+1;
-		}
-		else{
-			hist_page_sharers_R[sharers]=hist_page_sharers_R[sharers]+1;
-		}
-		U64 access_count = page_Rs[page] + page_Ws[page];
-		U64 log_ac = static_cast<uint64_t>(round(log2(access_count)));
-		if(log_ac>9) log_ac=9;
-		hist_page_shareres_nacc[log_ac][sharers]=hist_page_shareres_nacc[log_ac][sharers]+1;
 	}
+	
+	std::cout<<"new pages: "<<new_pages<<endl;
+	auto t_newassign = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsed_newa = t_newassign - sort_end;
+    std::cout << "Time taken for to assign owners to new pages: " << elapsed_newa.count() << " seconds\n";
+
+
+
 
 	//save vpage to owner mapping, before reassigning for next phase
 	// Record Stat Data from this phase
@@ -494,16 +404,17 @@ int process_phase(){
     }
 
 	//if(curphase>=phase_to_dump_pagemapping && curphase<(phase_to_dump_pagemapping+num_phases_to_dump_pagemapping)){
-		cout<<"dumping page to socket mapping"<<std::endl;
-		save_uo_map(page_owner,"page_owner.txt\0");
-		save_uo_map(page_owner_CI,"page_owner_CI.txt\0");
+		// cout<<"dumping page to socket mapping"<<std::endl;
+		// save_uo_map(page_owner,"page_owner.txt\0");
+		// save_uo_map(page_owner_CI,"page_owner_CI.txt\0");
 	//}
 
+	
 
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// Reassign owners
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-if(LIMIT_MIGRATION){
+	if(LIMIT_MIGRATION){
 		uint64_t pingpong_lim = curphase / 4;
 		uint64_t pool_cap = (page_owner_CI.size())/POOL_FRACTION;
 		auto it_migration = sorted_candidates.begin();
@@ -714,8 +625,16 @@ if(LIMIT_MIGRATION){
 	}
 
 	std::cout<<"reassign owners done"<<std::endl;
+	auto reassign_end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsed6 = reassign_end - sort_end;
+    std::cout << "Time taken for reassign owners: " << elapsed6.count() << " seconds\n";
 
-	U64 total_pages = page_sharers.size();
+	cout<<"dumping page to socket mapping"<<std::endl;
+	save_uo_map(page_owner,"page_owner.txt\0");
+	save_uo_map(page_owner_CI,"page_owner_CI.txt\0");
+
+	//U64 total_pages = page_sharers.size();
+	U64 total_pages = page_sharers_long.size();
 	U64 memory_touched = total_pages*PAGESIZE;
 	U64 memory_touched_inMB = memory_touched>>20;
 	U64 sumallacc=0;
@@ -731,35 +650,7 @@ if(LIMIT_MIGRATION){
 	log_misc_stats(memory_touched_inMB,total_num_accs[0]
 	,sumallacc,migrated_pages,migrated_pages_CI,pages_to_CI, CXI_count, misc_log_full);
 
-	cout<<"baseline"<<endl;
-	cout<<"memtraffic on node 5: "<<mem_traffic[5]<<endl;
-	U64 linktraffic_5_12=link_traffic_R[5][12]+link_traffic_R[12][5]+link_traffic_W[5][12]+link_traffic_W[12][5];
-	cout<<"link traffic between 5 and 12: "<< linktraffic_5_12<<endl;
-	
-	cout<<"CXL Island"<<endl;
-	cout<<"memtraffic on node 5: "<<mem_traffic_CI[5]<<endl;
-	U64 linktraffic_5_12_CI=link_traffic_R_CI[5][12]+link_traffic_R_CI[12][5]+link_traffic_W_CI[5][12]+link_traffic_W_CI[12][5];
-	cout<<"link traffic between 5 and 12: "<< linktraffic_5_12_CI<<endl;
-	cout<<"traffic to CI from a single node(5): "<<CI_traffic_R[5]+CI_traffic_W[5]<<endl;
 
-	savearray(hist_access_sharers, N_SOCKETS_OFFSET,"access_hist.txt\0");
-	savearray(hist_access_sharers_W, N_SOCKETS_OFFSET,"access_hist_W.txt\0");
-	savearray(hist_access_sharers_R_to_RWP, N_SOCKETS_OFFSET,"access_hist_R_to_RWP.txt\0");
-	savearray(hist_access_sharers_R, N_SOCKETS_OFFSET,"access_hist_R.txt\0");
-	savearray(hist_page_sharers, N_SOCKETS_OFFSET,"page_hist.txt\0");
-	savearray(hist_page_sharers_W, N_SOCKETS_OFFSET,"page_hist_W.txt\0");
-	savearray(hist_page_sharers_R, N_SOCKETS_OFFSET,"page_hist_R.txt\0");
-	save2Darr(hist_page_shareres_nacc, N_SOCKETS_OFFSET, "page_hist_nacc.txt\0");
-
-	save_hophist(hop_hist_W,N_SOCKETS_OFFSET, "hop_hist_W.txt\0");
-	save_hophist(hop_hist_RO,N_SOCKETS_OFFSET, "hop_hist_RO.txt\0");
-	save_hophist(hop_hist_RtoRW,N_SOCKETS_OFFSET, "hop_hist_RtoRW.txt\0");
-
-	save_hophist(hop_hist_W_CI,N_SOCKETS_OFFSET, "hop_hist_W_CI.txt\0");
-	save_hophist(hop_hist_RO_CI,N_SOCKETS_OFFSET, "hop_hist_RO_CI.txt\0");
-	save_hophist(hop_hist_RtoRW_CI,N_SOCKETS_OFFSET, "hop_hist_RtoRW_CI.txt\0");
-
-	
 	curphase=curphase+1;
 	return 0;
 }
@@ -770,8 +661,6 @@ int main(){
 	omp_init_lock(&page_R_lock);
 	omp_init_lock(&page_owner_lock);
 	omp_init_lock(&page_owner_CI_lock);
-	omp_init_lock(&hop_hist_lock);
-	omp_init_lock(&hop_hist_CI_lock);
 	
 	assert(HISTORY_LEN >=1);
 	
@@ -787,8 +676,11 @@ int main(){
 	for(int i=0; i<N_THR;i++){
 		std::ostringstream tfname;
 		tfname << "memtrace_t" << (i+THR_OFFSET_VAL) << ".out";
-		std::cout<<tfname.str()<<std::endl;
+		//std::cout<<tfname.str()<<std::endl;
     	trace[i] = fopen(tfname.str().c_str(), "rb");
+		if(trace[i]==NULL){
+			std::cerr<<tfname.str()<<" failed to open"<<std::endl;
+		}
 	}
 
 	process_phase(); //do a single phase for warmup(page allocation)

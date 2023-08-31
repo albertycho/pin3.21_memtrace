@@ -11,7 +11,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cassert>
-#include <chrono>
+
 #include <cmath>
 #include <queue>
 #include <stack>
@@ -503,26 +503,15 @@ int process_phase(){
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// Reassign owners
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-if(LIMIT_MIGRATION){
-		uint64_t pingpong_lim = curphase / 4;
+	if(LIMIT_MIGRATION){
 		uint64_t pool_cap = (page_owner_CI.size())/POOL_FRACTION;
 		auto it_migration = sorted_candidates.begin();
-		auto eviction_it = sorted_candidates.rbegin();
-
+		//for(int i=0;i<MIGRATION_LIMIT;i++){
 		uint64_t i=0;
 		uint64_t i_cxi=0;
-		bool eviction_candidate_was_hot=false;
 		while((i<MIGRATION_LIMIT) || (i_cxi<MIGRATION_LIMIT)){
-			auto reassign_1_page_start = std::chrono::high_resolution_clock::now();
 			// if(i<3){
 			// 	cout<<"i: "<<i<<", page: "<<it_migration->first<<endl;
-			// }
-			//cout<<"it->first: "<<it_migration->first<<", it->second: "<<it_migration->second<<endl;
-			//if(it_migration->second < )
-			// if(it_migration->second < 100){
-			// 	//pages are not hot anymore, stop migrating
-			// 	i=MIGRATION_LIMIT+1;
-			// 	i_cxi=MIGRATION_LIMIT+1;
 			// }
 			U64 page  = it_migration->first;
 			U64 most_acc=0;
@@ -530,24 +519,21 @@ if(LIMIT_MIGRATION){
 			U64 sharers = page_sharers_long[page];
 			//TODO assign random owner among sharers for pages with +8 sharers
 			if(sharers>=8){
-				// uint64_t tmp_i = rand()%sharers;
-				// //dbg
-				// //cout<<"sharers: "<<sharers <<", tmp_i: "<<tmp_i<<endl;
-				// ////
-				// U64 tmp_j=0;
-				// new_owner=0;
-				// for(U64 j=0; j<N_SOCKETS;j++){
-				// 	if(page_access_counts_consol[j][page]>0){
-				// 		if(tmp_j==tmp_i){
-				// 			new_owner = j;
-				// 			break;
-				// 		}
-				// 		tmp_j++;
-				// 	}
-				// }
-				//screw this, too slow
-				new_owner=rand()%N_SOCKETS;
-
+				uint64_t tmp_i = rand()%sharers;
+				//dbg
+				//cout<<"sharers: "<<sharers <<", tmp_i: "<<tmp_i<<endl;
+				////
+				U64 tmp_j=0;
+				new_owner=0;
+				for(U64 j=0; j<N_SOCKETS;j++){
+					if(page_access_counts_consol[j][page]>0){
+						if(tmp_j==tmp_i){
+							new_owner = j;
+							break;
+						}
+						tmp_j++;
+					}
+				}
 				//cout<<"new owner: "<<new_owner<<endl;
 			}
 			else{
@@ -558,24 +544,12 @@ if(LIMIT_MIGRATION){
 					}
 				}
 			}
-			// auto t_new_owner = std::chrono::high_resolution_clock::now();
-			// std::chrono::duration<double> elapsed_new_owner = t_new_owner - reassign_1_page_start;
-			// std::cout << "Time taken for finding new owner : " << elapsed_new_owner.count() << " seconds\n";
-
 			if(i<MIGRATION_LIMIT){ // baseline
 				//for baseline
-				//assert(page_owner.find(page)!=page_owner.end()); //remove this after sanity check
+				assert(page_owner.find(page)!=page_owner.end()); //remove this after sanity check
 				
-				U64 old_owner=0;
-				// auto pp_it = page_owner.find(page);
-				// if(pp_it==page_owner.end()){ //new page first touch
-				// 	old_owner=new_owner;
-				// }
-				// else{
-				// 	old_owner = pp_it->second;//page_owner[page];
-				// }
-				old_owner=page_owner[page];
-				if (migration_per_page[page] <= (pingpong_lim)) {
+				U64 old_owner = page_owner[page];
+				if (migration_per_page[page] <= (curphase / 4)) {
 					if (old_owner != new_owner) {
 						//if migrated. if no migration, don't increment
 						i++;
@@ -585,26 +559,14 @@ if(LIMIT_MIGRATION){
 					}
 				}
 			}
-			auto t_baseline = std::chrono::high_resolution_clock::now();
-			// std::chrono::duration<double> elapsed_baseline = t_baseline - t_new_owner;
-			// std::cout << "Time taken for assigning baseline : " << elapsed_baseline.count() << " seconds\n";
 			if(i_cxi<MIGRATION_LIMIT){ // cxl-island
 				//U64 sharers = page_sharers_long[page];
 				//U64 old_owner = page_owner_CI[page];
-				if (migration_per_page_CI[page] <= (pingpong_lim)) {
-					U64 old_owner=page_owner_CI[page];
-					// auto pp_it = page_owner.find(page);
-					// if(pp_it==page_owner_CI.end()){ //new page first touch
-					// 	old_owner=new_owner;
-					// }
-					// else{
-					// 	old_owner = page_owner_CI[page];
-					// }
-					if(!eviction_candidate_was_hot && (sharers >= SHARER_THRESHOLD)){
-						//if (sharers >= SHARER_THRESHOLD) {
-							// with replication allowed, would have to check RW ratio and take appropraite step
-							//if (page_owner_CI[page] != CXO) {
-						if (old_owner != CXO) {
+				if (migration_per_page_CI[page] <= (curphase/4)) {
+					if (sharers >= SHARER_THRESHOLD) {
+
+						// with replication allowed, would have to check RW ratio and take appropraite step
+						if (page_owner_CI[page] != CXO) {
 							pages_to_CI++;
 							pages_in_pool++;
 							i_cxi++;
@@ -612,45 +574,34 @@ if(LIMIT_MIGRATION){
 							migration_per_page_CI[page] = migration_per_page_CI[page] + 1;
 							//deal eviction if full capacity
 							if(pool_cap <= pages_in_pool){
-								//std::cout<<"DBG: is pool_cap being hit?"<<endl;
 								//find eviction candidate
 								uint64_t evicted_page=0;
-								//auto it = sorted_candidates.rbegin();
-								for(; eviction_it != sorted_candidates.rend(); ++eviction_it) {
-									if(page_owner_CI[eviction_it->first] == CXO) {
-										evicted_page = eviction_it->first;
-										break;
-									}
+								auto it = sorted_candidates.rbegin();
+								for(; it != sorted_candidates.rend(); ++it) {
+								    if(page_owner_CI[it->first] == CXO) {
+										evicted_page = it->first;
+								        break;
+								    }
 								}
-								//std::cout<<"eviction_candidate access count: "<<eviction_it->second<<endl;
-								if(eviction_it==sorted_candidates.rend()) {
-									cout<<"WARNING: needed to find eviction candidate from pool but didn't find"<<endl;
-									i_cxi=MIGRATION_LIMIT+1;
-								}
-								//U64 ev_most_acc=0;
-								if((eviction_it->second)>=(it_migration->second)){
-									//i_cxi=MIGRATION_LIMIT;
-									cout<<"eviction candidate is hotter than new element into CXL island"<<endl;
-									eviction_candidate_was_hot=true;
-								}
+								if(it==sorted_candidates.rend()) cout<<"WARNING: needed to find eviction candidate from pool but didn't find"<<endl;
 								U64 ev_most_acc=0;
-								U64 ev_new_owner=rand() % N_SOCKETS;								
+								U64 ev_new_owner=rand() % N_SOCKETS;
 								U64 ev_sharers = page_sharers_long[evicted_page];
 								if(ev_sharers>=8){
-									// uint64_t tmp_i = rand()%sharers;
-									// //dbg
-									// //std::cout<<"ev_sharers: "<<ev_sharers <<", tmp_i: "<<tmp_i<<endl;
-									// ////
-									// U64 tmp_j=0;
-									// for(U64 j=0; j<N_SOCKETS;j++){
-									// 	if(page_access_counts_consol[j][evicted_page]>1){
-									// 		if(tmp_j==tmp_i){
-									// 			ev_new_owner = j;
-									// 			break;
-									// 		}
-									// 		tmp_j++;
-									// 	}
-									// }
+									uint64_t tmp_i = rand()%sharers;
+									//dbg
+									//std::cout<<"ev_sharers: "<<ev_sharers <<", tmp_i: "<<tmp_i<<endl;
+									////
+									U64 tmp_j=0;
+									for(U64 j=0; j<N_SOCKETS;j++){
+										if(page_access_counts_consol[j][evicted_page]>1){
+											if(tmp_j==tmp_i){
+												ev_new_owner = j;
+												break;
+											}
+											tmp_j++;
+										}
+									}
 									//cout<<"ev_new_owner: "<<ev_new_owner<<endl;									
 								}
 								else{
@@ -661,26 +612,15 @@ if(LIMIT_MIGRATION){
 										}
 									}
 								}
-								// screw this, takes too long. if u were on the island, u had a lot of sharers.
 
 								page_owner_CI[evicted_page] = ev_new_owner;
 								pages_in_pool--;
-								i_cxi++;
 
 							}
 						}
-						//}
 					}
 					else {
-						//U64 old_owner=0;
-						//auto pp_it = page_owner.find(page);
-						// if(pp_it==page_owner_CI.end()){ //new page first touch
-						// 	old_owner=new_owner;
-						// }
-						// else{
-						// 	old_owner = page_owner_CI[page];
-						// }
-						if (old_owner != new_owner) {
+						if (page_owner_CI[page] != new_owner) {
 							migrated_pages_CI++;
 							page_owner_CI[page] = new_owner;
 							i_cxi++;
@@ -690,9 +630,6 @@ if(LIMIT_MIGRATION){
 				}
 				
 			}
-			auto t_cxi = std::chrono::high_resolution_clock::now();
-			std::chrono::duration<double> elapsed_cxi = t_cxi - t_baseline;
-			//std::cout << "Time taken for assigning cxi : " << elapsed_cxi.count() << " seconds\n";
 
 			it_migration++;
 			if(it_migration==sorted_candidates.end()){//reached end of pages
@@ -700,17 +637,48 @@ if(LIMIT_MIGRATION){
 				cout<<"sorted candidates size: "<<sorted_candidates.size()<<endl;
 				break;
 			}
-			auto reassign_1_page_end = std::chrono::high_resolution_clock::now();
-			std::chrono::duration<double> elapsed5 = reassign_1_page_end - reassign_1_page_start;
-			//std::cout << "Time taken for reassigning page "<< i<< ": " << elapsed5.count() << " seconds\n";
-
-
 			
 		}
 
 	}
 	else{
-		std::cout<<"ONLY SUPPORTS SIMULATION WITH MIGARTION LIMIT!"<<endl;
+		for (const auto& po : page_owner) {
+			U64 page = po.first;
+			U64 sharers = page_sharers_long[page];
+			if(sharers==0){
+				//no one accssed this page, no owner change
+				continue;
+			}
+			U64 most_acc=0;
+			U64 new_owner=INVAL_OWNER;
+
+			for(U64 i=0; i<pac_size;i++){
+				if(page_access_counts_consol[i][page]>most_acc){
+					most_acc = page_access_counts_consol[i][page];
+					new_owner=i;
+				}
+			}
+			assert(new_owner!=INVAL_OWNER);
+			if(page_owner.find(page)!=page_owner.end()){
+				if(page_owner[page]!=new_owner){
+					migrated_pages++;			
+				}
+			}
+			page_owner[page]=new_owner;
+			//page_owner_CI[page]=new_owner;
+			if(sharers>=SHARER_THRESHOLD){
+				if(page_owner_CI[page]!=CXO){
+					pages_to_CI++;
+				}
+				page_owner_CI[page]=CXO;
+			}
+			else{
+				if(page_owner_CI[page]!=new_owner){
+					migrated_pages_CI++;
+				}
+				page_owner_CI[page]=new_owner;
+			}
+		}
 	}
 
 	std::cout<<"reassign owners done"<<std::endl;

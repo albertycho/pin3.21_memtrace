@@ -31,3 +31,4 @@ proc_scripts/.plot_page_hists.py.swp
 */*.swp
 proc_scripts/.vscode/
 proc_scripts/.vscode/*
+/.vs/slnx.sqlite-journal

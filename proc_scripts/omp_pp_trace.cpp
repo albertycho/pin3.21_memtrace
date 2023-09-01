@@ -137,6 +137,10 @@ int process_phase(){
 
 	U64 total_num_accs[N_THR]={0};
 
+	//// @@@ TRACED READING for the phase
+	/* Every access is read and recorded in page_access_counts 
+	 * (per thread in the while loop, then consolidated to per-socket (4 threads per socket)
+	 */
 	#pragma omp parallel for
 	for (int i=0; i<N_THR;i++){
 		//U64 nompt=omp_get_num_threads();
@@ -228,7 +232,8 @@ int process_phase(){
 			any_trace_done=true;
 		}
 
-		/////////coalescing local stats into one
+
+		///////// @@@ coalescing local stats into one
 		total_num_accs[i]+=tmp_numacc;
 		#pragma omp critical
 		{
@@ -255,7 +260,7 @@ int process_phase(){
 
 	}
 	
-	//consoliate page_access_counts per thread into per socket
+	// @@@ consolidate page_access_counts per thread into per socket
 	for(uint64_t ii=0; ii<N_THR; ii++){
 		uint64_t socketid = ii>>2; //4 cores per socket
 		for(const auto& pt : page_access_counts_per_thread[ii]){
@@ -270,6 +275,8 @@ int process_phase(){
 	}
 
 
+	/* @@@ following is legacy code from when making migration decsion for 100M instruction phase, based on profiling info from past 1B instructions
+	 */
 	//update access data from past 1 billion instructions
 	page_access_counts_history.push_back(page_access_counts);
 	page_access_counts_R_history.push_back(page_access_counts_R);
@@ -331,6 +338,9 @@ int process_phase(){
 			assert(page_sharers_long[page] < N_SOCKETS+1);
 		}
 	}
+
+
+
 
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// log sharers for each page for this phase
@@ -493,15 +503,14 @@ int process_phase(){
         std::cout << "Created directory " << dir_name << std::endl;
     }
 
-	//if(curphase>=phase_to_dump_pagemapping && curphase<(phase_to_dump_pagemapping+num_phases_to_dump_pagemapping)){
-		cout<<"dumping page to socket mapping"<<std::endl;
-		save_uo_map(page_owner,"page_owner.txt\0");
-		save_uo_map(page_owner_CI,"page_owner_CI.txt\0");
-	//}
+	// @@@ Save page mapping that was used for this phase, before reassigning owners
+	cout<<"dumping page to socket mapping"<<std::endl;
+	save_uo_map(page_owner,"page_owner.txt\0");
+	save_uo_map(page_owner_CI,"page_owner_CI.txt\0");
 
 
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	// Reassign owners
+	// Reassign owners (Equivalent to "Algorithm 1")
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 if(LIMIT_MIGRATION){
 		uint64_t pingpong_lim = curphase / 4;
@@ -514,38 +523,12 @@ if(LIMIT_MIGRATION){
 		bool eviction_candidate_was_hot=false;
 		while((i<MIGRATION_LIMIT) || (i_cxi<MIGRATION_LIMIT)){
 			auto reassign_1_page_start = std::chrono::high_resolution_clock::now();
-			// if(i<3){
-			// 	cout<<"i: "<<i<<", page: "<<it_migration->first<<endl;
-			// }
-			//cout<<"it->first: "<<it_migration->first<<", it->second: "<<it_migration->second<<endl;
-			//if(it_migration->second < )
-			// if(it_migration->second < 100){
-			// 	//pages are not hot anymore, stop migrating
-			// 	i=MIGRATION_LIMIT+1;
-			// 	i_cxi=MIGRATION_LIMIT+1;
-			// }
 			U64 page  = it_migration->first;
 			U64 most_acc=0;
 			U64 new_owner=INVAL_OWNER;
 			U64 sharers = page_sharers_long[page];
-			//TODO assign random owner among sharers for pages with +8 sharers
+			//ssign random owner among sharers for pages with +8 sharers (if the page is not going to pool)
 			if(sharers>=8){
-				// uint64_t tmp_i = rand()%sharers;
-				// //dbg
-				// //cout<<"sharers: "<<sharers <<", tmp_i: "<<tmp_i<<endl;
-				// ////
-				// U64 tmp_j=0;
-				// new_owner=0;
-				// for(U64 j=0; j<N_SOCKETS;j++){
-				// 	if(page_access_counts_consol[j][page]>0){
-				// 		if(tmp_j==tmp_i){
-				// 			new_owner = j;
-				// 			break;
-				// 		}
-				// 		tmp_j++;
-				// 	}
-				// }
-				//screw this, too slow
 				new_owner=rand()%N_SOCKETS;
 
 				//cout<<"new owner: "<<new_owner<<endl;
@@ -558,22 +541,11 @@ if(LIMIT_MIGRATION){
 					}
 				}
 			}
-			// auto t_new_owner = std::chrono::high_resolution_clock::now();
-			// std::chrono::duration<double> elapsed_new_owner = t_new_owner - reassign_1_page_start;
-			// std::cout << "Time taken for finding new owner : " << elapsed_new_owner.count() << " seconds\n";
+
 
 			if(i<MIGRATION_LIMIT){ // baseline
-				//for baseline
-				//assert(page_owner.find(page)!=page_owner.end()); //remove this after sanity check
-				
+				//for baseline				
 				U64 old_owner=0;
-				// auto pp_it = page_owner.find(page);
-				// if(pp_it==page_owner.end()){ //new page first touch
-				// 	old_owner=new_owner;
-				// }
-				// else{
-				// 	old_owner = pp_it->second;//page_owner[page];
-				// }
 				old_owner=page_owner[page];
 				if (migration_per_page[page] <= (pingpong_lim)) {
 					if (old_owner != new_owner) {
@@ -589,21 +561,9 @@ if(LIMIT_MIGRATION){
 			// std::chrono::duration<double> elapsed_baseline = t_baseline - t_new_owner;
 			// std::cout << "Time taken for assigning baseline : " << elapsed_baseline.count() << " seconds\n";
 			if(i_cxi<MIGRATION_LIMIT){ // cxl-island
-				//U64 sharers = page_sharers_long[page];
-				//U64 old_owner = page_owner_CI[page];
 				if (migration_per_page_CI[page] <= (pingpong_lim)) {
 					U64 old_owner=page_owner_CI[page];
-					// auto pp_it = page_owner.find(page);
-					// if(pp_it==page_owner_CI.end()){ //new page first touch
-					// 	old_owner=new_owner;
-					// }
-					// else{
-					// 	old_owner = page_owner_CI[page];
-					// }
 					if(!eviction_candidate_was_hot && (sharers >= SHARER_THRESHOLD)){
-						//if (sharers >= SHARER_THRESHOLD) {
-							// with replication allowed, would have to check RW ratio and take appropraite step
-							//if (page_owner_CI[page] != CXO) {
 						if (old_owner != CXO) {
 							pages_to_CI++;
 							pages_in_pool++;
@@ -637,21 +597,7 @@ if(LIMIT_MIGRATION){
 								U64 ev_new_owner=rand() % N_SOCKETS;								
 								U64 ev_sharers = page_sharers_long[evicted_page];
 								if(ev_sharers>=8){
-									// uint64_t tmp_i = rand()%sharers;
-									// //dbg
-									// //std::cout<<"ev_sharers: "<<ev_sharers <<", tmp_i: "<<tmp_i<<endl;
-									// ////
-									// U64 tmp_j=0;
-									// for(U64 j=0; j<N_SOCKETS;j++){
-									// 	if(page_access_counts_consol[j][evicted_page]>1){
-									// 		if(tmp_j==tmp_i){
-									// 			ev_new_owner = j;
-									// 			break;
-									// 		}
-									// 		tmp_j++;
-									// 	}
-									// }
-									//cout<<"ev_new_owner: "<<ev_new_owner<<endl;									
+
 								}
 								else{
 									for(U64 j=0; j<N_SOCKETS;j++){
@@ -672,14 +618,6 @@ if(LIMIT_MIGRATION){
 						//}
 					}
 					else {
-						//U64 old_owner=0;
-						//auto pp_it = page_owner.find(page);
-						// if(pp_it==page_owner_CI.end()){ //new page first touch
-						// 	old_owner=new_owner;
-						// }
-						// else{
-						// 	old_owner = page_owner_CI[page];
-						// }
 						if (old_owner != new_owner) {
 							migrated_pages_CI++;
 							page_owner_CI[page] = new_owner;
@@ -742,6 +680,7 @@ if(LIMIT_MIGRATION){
 	cout<<"link traffic between 5 and 12: "<< linktraffic_5_12_CI<<endl;
 	cout<<"traffic to CI from a single node(5): "<<CI_traffic_R[5]+CI_traffic_W[5]<<endl;
 
+	// @@@@@ saving stat tracking files
 	savearray(hist_access_sharers, N_SOCKETS_OFFSET,"access_hist.txt\0");
 	savearray(hist_access_sharers_W, N_SOCKETS_OFFSET,"access_hist_W.txt\0");
 	savearray(hist_access_sharers_R_to_RWP, N_SOCKETS_OFFSET,"access_hist_R_to_RWP.txt\0");

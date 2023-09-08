@@ -266,9 +266,6 @@ uint64_t access_cache(cache_t& cach, uint64_t lineaddr, bool isW, uint64_t ts, u
     //uint64_t set_index_dbg = lineaddr % NUM_SETS;
     //assert(set_index==set_index_dbg);
 
-
-
-
 	simstats.total_m_insts++;
     //find hit
     uint64_t hit_i=0;

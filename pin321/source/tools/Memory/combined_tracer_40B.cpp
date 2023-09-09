@@ -276,7 +276,7 @@ void open_champsim_trace(THREADID tid) {
     std::ostringstream ctfname;
     cst_phase[tid]++;
     if (cst_phase[tid] != (ins_count[tid] / PHASE_INTERVAL)) {
-        std::cout << "cst_phase does not match is_count/PHASE_INTERVAL" << std::endl;
+        std::cout << "cst_phase does not match ins_count/PHASE_INTERVAL" << std::endl;
         std::cout << "cst_pahse " << tid << " : " << cst_phase[tid] << std::endl;
         std::cout << "inscount/PHASE_INTERVAL : " << ins_count[tid] / PHASE_INTERVAL << std::endl;
     }
@@ -301,7 +301,7 @@ void open_mtrace_nf(THREADID tid){
     
     mt_nf_phase[tid]++;
     if (mt_nf_phase[tid] != (ins_count[tid] / PHASE_INTERVAL)) {
-        std::cout << "mt_nf_phase does not match is_count/PHASE_INTERVAL" << std::endl;
+        std::cout << "mt_nf_phase does not match ins_count/PHASE_INTERVAL" << std::endl;
         std::cout << "cst_pahse " << tid << " : " << mt_nf_phase[tid] << std::endl;
         std::cout << "inscount/PHASE_INTERVAL : " << ins_count[tid] / PHASE_INTERVAL << std::endl;
     }    
@@ -843,6 +843,7 @@ VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) {
     std::ostringstream mtfname;
     mtfname << "mtrace_t"<<tid<<"_"<<0<<".out";
     mtrace_nofilter[tid] = fopen(mtfname.str().c_str(), "wb");
+    mt_nf_open[tid]=true;
 
     if(is_champsim_trace_tid(tid)){
         std::ostringstream ctfname;

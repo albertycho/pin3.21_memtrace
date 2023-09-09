@@ -36,13 +36,11 @@ std::ofstream dummyofs; //for decltype compiler error suppression
 std::ofstream champsim_outfile[MAX_THREADS];
 
 bool cst_open[MAX_THREADS];
-bool mt_nf_open[MAX_THREADS];
 uint64_t cst_phase[MAX_THREADS] = { 0 };
-uint64_t mt_nf_phase[MAX_THREADS] = { 0 };
 
 //FILE * trace_sancheck;
 FILE * trace[MAX_THREADS];
-FILE * mtrace_nofilter[MAX_THREADS];
+FILE * trace_nofilter[MAX_THREADS];
 //FILE * ins_trace[MAX_THREADS];
 //KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "memtrace.out", "specify output file name");
 KNOB< BOOL > KnobStartFF(KNOB_MODE_WRITEONCE, "pintool", "startFF", "0", "no trace until ROI start indicated");
@@ -72,13 +70,6 @@ uint64_t t_buf[MAX_THREADS][TBUF_SIZE];
 uint8_t rw_buf[MAX_THREADS][TBUF_SIZE];
 uint64_t timestamp_buf[MAX_THREADS][TBUF_SIZE];
 uint64_t tb_i[MAX_THREADS] = {};
-
-// for mtrace_nofilter
-uint64_t t_buf_nf[MAX_THREADS][TBUF_SIZE];
-uint8_t rw_buf_nf[MAX_THREADS][TBUF_SIZE];
-uint64_t timestamp_buf_nf[MAX_THREADS][TBUF_SIZE];
-uint64_t tb_i_nf[MAX_THREADS] = {};
-
 
 uint64_t numThreads = 0;
 
@@ -133,7 +124,8 @@ typedef CACHE_ROUND_ROBIN(max_sets, associativity, allocation) CACHE;
 static UL3::CACHE *ul3[MAX_THREADS];
 
 
-static inline VOID dump_tbuf(THREADID tid) {
+
+static inline VOID dump_tbuf(THREADID tid) { //TODO add threaID to arg
 	if(tid>=MAX_THREADS){
 		return;
 	}
@@ -154,23 +146,6 @@ static inline VOID dump_tbuf(THREADID tid) {
     }
     tb_i[tid] = 0;
 }
-static inline VOID dump_tbuf_nf(THREADID tid) {
-	if(tid>=MAX_THREADS){
-		return;
-	}
-    //added this as an optimization, but doesn't seem to save runtime much :(
-    uint64_t tmp_tbi = tb_i_nf[tid];
-    for (uint64_t i = 0; i < tmp_tbi; i++) {
-        //we don't care about last few bits of addr, so pack RW info in there
-        //uint64_t lsb_unsetter = ~0xF;
-        uint64_t addr_rw = t_buf_nf[tid][i] & ~0xF;
-        addr_rw = addr_rw+rw_buf_nf[tid][i];
-        uint64_t timestamp = timestamp_buf_nf[tid][i];
-        fwrite(&addr_rw, sizeof(uint64_t), 1,mtrace_nofilter[tid]);
-        fwrite(&timestamp, sizeof(uint64_t), 1,mtrace_nofilter[tid]);
-    }
-    tb_i_nf[tid] = 0;
-}
 
 static VOID Fini(int code, VOID* v) //TODO this should change to threadfini?
 {
@@ -189,7 +164,6 @@ VOID ThreadFini(THREADID tid, const CONTEXT* ctxt, INT32 code, VOID* v) {
 	}
 
     dump_tbuf(tid);
-    dump_tbuf_nf(tid);
     std::cout <<"thread_"<<tid << " num mem accesses: " << num_maccess[tid] << std::endl;
     std::cout << "thread_" << tid << " Fini finished" << std::endl;
     fclose(trace[tid]);
@@ -208,21 +182,6 @@ static inline VOID recordAccess(ADDRINT addr, THREADID tid, CACHE_BASE::ACCESS_T
     tb_i[tid]++;
     if (tb_i[tid] == TBUF_SIZE) {
         dump_tbuf(tid);
-    }
-}
-
-static inline VOID recordAccess_nf(ADDRINT addr, THREADID tid, CACHE_BASE::ACCESS_TYPE accessType) { //TODO add threaID to arg
-	if(tid>=MAX_THREADS){
-		return;
-	}
-
-    //num_maccess[tid]++;
-    t_buf_nf[tid][tb_i_nf[tid]] = addr;
-	rw_buf_nf[tid][tb_i_nf[tid]] = accessType;
-    timestamp_buf_nf[tid][tb_i_nf[tid]] = ins_count[tid];
-    tb_i_nf[tid]++;
-    if (tb_i_nf[tid] == TBUF_SIZE) {
-        dump_tbuf_nf(tid);
     }
 }
 
@@ -287,29 +246,9 @@ void open_champsim_trace(THREADID tid) {
         std::cout << "Couldn't open output trace file. Exiting." << std::endl;
         exit(1);
     }
-
-    
     cst_open[tid] = true;
 
     return;
-}
-
-void open_mtrace_nf(THREADID tid){
-	if(tid>=MAX_THREADS){
-		return;
-	}
-    
-    mt_nf_phase[tid]++;
-    if (mt_nf_phase[tid] != (ins_count[tid] / PHASE_INTERVAL)) {
-        std::cout << "mt_nf_phase does not match is_count/PHASE_INTERVAL" << std::endl;
-        std::cout << "cst_pahse " << tid << " : " << mt_nf_phase[tid] << std::endl;
-        std::cout << "inscount/PHASE_INTERVAL : " << ins_count[tid] / PHASE_INTERVAL << std::endl;
-    }    
-     ////////open nofilter mtrace
-    std::ostringstream mtfname;
-    mtfname << "mtrace_t"<<tid<<"_"<<mt_nf_phase[tid]<<".out";
-    mtrace_nofilter[tid] = fopen(mtfname.str().c_str(), "wb");
-    mt_nf_open[tid]=true;
 }
 
 void close_champsim_trace(THREADID tid) {
@@ -327,23 +266,6 @@ void close_champsim_trace(THREADID tid) {
     return;
 }
 
-void close_mtrace_nf(THREADID tid){
-    if(tid>=MAX_THREADS){
-		return;
-	}
-
-    if(mtrace_nofilter[tid]!=NULL){
-        fclose(mtrace_nofilter[tid]);
-        mtrace_nofilter[tid]=NULL;
-        mt_nf_open[tid]=false;
-    }
-    else {
-        std::cout << "mtrace_nofilter " << tid << " was not open in call to close_mt_nf" << std::endl;
-    }
-    return;
-
-}
-
 inline bool is_champsim_trace_tid(THREADID tid){
     if(tid<champsim_trace_tid_min){
         return false;
@@ -352,27 +274,6 @@ inline bool is_champsim_trace_tid(THREADID tid){
         return false;
     }
     return true;
-}
-
-BOOL ShouldWrite_mt_nf(THREADID tid){
-    if(tid>=MAX_THREADS){
-        return false;
-    }
-    if(!(inROI[tid] || inROI_master)){
-        return false;
-    }
-    if ((ins_count[tid] % PHASE_INTERVAL) <= champsim_traceins) { //true, trace on
-        if(mt_nf_open[tid]==false){
-            open_mtrace_nf(tid);
-        }
-        return true;
-    }
-    else{
-        if(mt_nf_open[tid]==true){
-            close_mtrace_nf(tid);
-        }
-        return false;
-    }
 }
 
 BOOL ShouldWrite(THREADID tid)
@@ -642,9 +543,6 @@ static VOID MemRefMulti(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE acces
     //TODO figure out how to handle memref_multi
     //Ul3Access(addr, size, accessType, tid);
     Ul2Access(addr, size, accessType, tid);
-    if(ShouldWrite_mt_nf(tid)){
-        recordAccess_nf(addr,tid,accessType);
-    }
     return;
 
     //memref_multi_count++;
@@ -678,9 +576,6 @@ static VOID MemRefSingle(ADDRINT addr, UINT32 size, CACHE_BASE::ACCESS_TYPE acce
 
     //Ul3Access(addr, size, accessType, tid);
     Ul2Access(addr, size, accessType, tid);
-    if(ShouldWrite_mt_nf(tid)){
-        recordAccess_nf(addr,tid,accessType);
-    }
     return;
     //DBG counter
     //memref_single_count++;
@@ -839,10 +734,6 @@ VOID ThreadStart(THREADID tid, CONTEXT* ctxt, INT32 flags, VOID* v) {
     tfname << "memtrace_t" << tid << ".out";
     trace[tid] = fopen(tfname.str().c_str(), "wb");
     //trace_sancheck = fopen("asdf.txt", "w");
-    ////////open nofilter mtrace
-    std::ostringstream mtfname;
-    mtfname << "mtrace_t"<<tid<<"_"<<0<<".out";
-    mtrace_nofilter[tid] = fopen(mtfname.str().c_str(), "wb");
 
     if(is_champsim_trace_tid(tid)){
         std::ostringstream ctfname;

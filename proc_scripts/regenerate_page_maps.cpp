@@ -42,12 +42,18 @@ int main() {
     //std::string base = "DBG2_1B_512K_4_Phase";
     //std::string base = "1B_128K_4_Phase";
     //std::string base = "1B_32K_4_Phase";
-    std::string base = "1B_128K_16_Phase";
+    //std::string base = "1B_32K_4_2sharers_Phase";
+    std::string base = "2B_64K_4_2sharers_Phase";
+    //std::string base = "1B_128K_16_Phase";
     //std::string base = "1B_0_4_Phase";
+	
 	//std::string output_base = "pagemaps_8K/";
-	std::string output_base = "pagemaps_8K_16/";
+	//std::string output_base = "pagemaps_2K_4/";
+	std::string output_base = "pagemaps_2B_2K_4_2sharers/";
+	//std::string output_base = "pagemaps_8K_16/";
 	//std::string output_base = "pagemaps_nomg/";
-    std::filesystem::create_directory(output_base);
+    
+	std::filesystem::create_directory(output_base);
     //std::string base = "1B_512K_Phase";
     while (std::filesystem::exists(base + std::to_string(i+1))) {
         if(1){
@@ -64,8 +70,10 @@ int main() {
                 if (owner1 == owner2) {
                     new_page_map[page_number] = owner2;
                 } else {
-                    uint64_t rand_val = rand() % 16;
-                    if(rand_val <15) {
+                    uint64_t rand_val = rand() % 32;
+                    if(rand_val <31) {
+                    //uint64_t rand_val = rand() % 16;
+                    //if(rand_val <15) {
                         // map to owner of Phase1
                         new_page_map[page_number] = owner2; // or owner2, based on randomness
                     } else {
@@ -100,8 +108,10 @@ int main() {
                 if (owner1 == owner2) {
                     new_page_map[page_number] = owner2;
                 } else {
-                    uint64_t rand_val = rand() % 16;
-                    if(rand_val <15) {
+                    uint64_t rand_val = rand() % 32;
+                    if(rand_val <31) {
+                    //uint64_t rand_val = rand() % 16;
+                    //if(rand_val <15) {
                         // map to owner of Phase1
                         new_page_map[page_number] = owner2; // or owner2, based on randomness
                     } else {

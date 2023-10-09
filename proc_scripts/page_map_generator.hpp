@@ -30,28 +30,31 @@
 #define N_SOCKETS_OFFSET (N_SOCKETS+1)
 #define U64 uint64_t
 #define CXO 100 //CXL Island is owner
-#define SHARER_THRESHOLD 8
+#define SHARER_THRESHOLD 2
 #define INVAL_OWNER 9999
 
 #define NBILLION 1000000000
-#define HISTORY_LEN ((uint64_t)(NBILLION/PHASE_CYCLES))
+//#define HISTORY_LEN ((uint64_t)(NBILLION/PHASE_CYCLES))
+#define HISTORY_LEN 1
 
 //#define PHASE_CYCLES 10000000
 //#define MIGRATION_LIMIT 32768
 //// for ones that take too long
-#define PHASE_CYCLES 1000000000
+//#define PHASE_CYCLES 1000000000
+#define PHASE_CYCLES 2000000000
 //#define MIGRATION_LIMIT 3276800
 //#define MIGRATION_LIMIT 262144
 
 //#define MIGRATION_LIMIT 
 //#define MIGRATION_LIMIT 524288
-#define MIGRATION_LIMIT 131072
+//#define MIGRATION_LIMIT 131072
 //#define MIGRATION_LIMIT 32768
+#define MIGRATION_LIMIT 65536
 //#define MIGRATION_LIMIT 8192
 //#define MIGRATION_LIMIT 0
 
-//#define POOL_FRACTION 5
-#define POOL_FRACTION 17
+#define POOL_FRACTION 5
+//#define POOL_FRACTION 17
 
 using namespace std;
 
@@ -75,7 +78,8 @@ string generate_phasedirname(){
 	stringstream ss;
 	//ss<<"1B_512K_4_Phase"<<curphase;
 	//ss<<"1B_8K_4_Phase"<<curphase;
-	ss<<"1B_128K_16_Phase"<<curphase;
+	//ss<<"1B_32K_4_Phase"<<curphase;
+	ss<<"2B_64K_4_2sharers_Phase"<<curphase;
 	//ss<<"1B_0_4_Phase"<<curphase;
 	//ss<<"1BPhase"<<curphase;
 	//ss<<"100MPhase"<<curphase;

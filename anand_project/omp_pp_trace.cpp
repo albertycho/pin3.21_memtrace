@@ -22,6 +22,7 @@
 #include <sys/types.h> 
 #include "omp_pp_trace.hpp"
 
+
 // #define PAGESIZE 4096
 // #define PAGEBITS 12
 // #define N_THR 16
@@ -108,9 +109,9 @@ int process_phase(){
 	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_per_thread_sampled(N_THR);
 
 	// ANAND - <page_id, <old_owner, new_owner, number_of_sharers>>
-	unordered_map<uint64_t, array<uint64_t, 3>> migrated_pages_table;
-	unordered_map<uint64_t, array<uint64_t, 3>> migrated_pages_table_CI;
-	unordered_map<uint64_t, array<uint64_t, 3>> evicted_pages_table_CI;
+	unordered_map<uint64_t, array<uint64_t, 5>> migrated_pages_table;
+	unordered_map<uint64_t, array<uint64_t, 5>> migrated_pages_table_CI;
+	unordered_map<uint64_t, array<uint64_t, 5>> evicted_pages_table_CI;
 
 	// (page_id, number of accesses)
 	//list of all unique pages and their sharer count
@@ -285,7 +286,7 @@ int process_phase(){
 			if (!check_in_same_sampling_period(pa_count_sampled_last_ins[page], icount_val, first_icount_val)){
 				pa_count_sampled[page] = pa_count_sampled[page] + 1;
 				pa_count_sampled_last_ins[page] = icount_val;
-				assert(pa_count_sampled[page] < NBILLION/SAMPLING_PERIOD);
+				assert(pa_count_sampled[page] <= NBILLION/SAMPLING_PERIOD);
 			}
 			
 			readsize = read_8B_line(&buf_val, buffer, trace[i]);
@@ -378,6 +379,10 @@ int process_phase(){
 	unordered_map<uint64_t, uint64_t> page_Rs_consol={};
 	unordered_map<uint64_t, uint64_t> page_Ws_consol={};
 	
+	// ANAND
+	unordered_map<uint64_t, uint64_t> page_access_counts_consol_joined;
+
+
 	// sampled down version
 	// vector<unordered_map<uint64_t, uint64_t>> page_access_counts_consol_sampled(N_SOCKETS);
 	// this will be equal to page_access_counts_sampled(N_SOCKETS) because HISTORY_LEN is 1
@@ -476,6 +481,14 @@ int process_phase(){
 		//}
 	}
 	//cout<<"sorted candidates size: "<<sorted_candidates.size()<<endl;
+
+	// page_access_counts_consol_joined
+	for (const auto& pa_c : page_access_counts_consol) {
+		for (const auto& ppair : pa_c) {
+			U64 page = ppair.first;
+			page_access_counts_consol_joined[page]=page_access_counts_consol_joined[page]+ppair.second;
+		}
+	}
 
 
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -610,12 +623,27 @@ int process_phase(){
 
 	//save vpage to owner mapping, before reassigning for next phase
 	// Record Stat Data from this phase
-	string dir_name = generate_phasedirname();
-	if(mkdir(dir_name.c_str(),0777)==-1){
-		perror(("Error creating directory " + dir_name).c_str());
-    } else {
-        std::cout << "Created directory " << dir_name << std::endl;
-    }
+	string dir_path = generate_phasedirname();
+	//if(mkdir(dir_name.c_str(),0777)==-1){
+	//	perror(("Error creating directory " + dir_name).c_str());
+    //} else {
+    //    std::cout << "Created directory " << dir_name << std::endl;
+    //}
+
+    // Use the C++17 filesystem library to create directories
+    // try {
+    //     filesystem::create_directories(dir_path);
+    //     std::cout << "Directories created successfully." << std::endl;
+    // } catch (const std::exception& e) {
+    //     std::cerr << "Error: " << e.what() << std::endl;
+    //     return 1;
+    // }
+
+	std::string createDirectoryCmd = "mkdir -p " + dir_path;
+	int result = std::system(createDirectoryCmd.c_str());
+	cout << "result of creating repo " << result << endl;
+
+
 
 	// @@@ Save page mapping that was used for this phase, before reassigning owners
 	cout<<"dumping page to socket mapping"<<std::endl;
@@ -677,7 +705,7 @@ int process_phase(){
 						migration_per_page[page] = migration_per_page[page] + 1;
 
 						// ANAND
-						migrated_pages_table[page] = {old_owner, new_owner, sharers};
+						migrated_pages_table[page] = {old_owner, new_owner, sharers, page_access_counts_consol_joined[page], page_access_counts_sampled_joined[page]};
 
 					}
 				}
@@ -697,7 +725,7 @@ int process_phase(){
 							migration_per_page_CI[page] = migration_per_page_CI[page] + 1;
 
 							// ANAND
-							migrated_pages_table_CI[page] = {old_owner, new_owner, sharers};
+							migrated_pages_table_CI[page] = {old_owner, 100, sharers, page_access_counts_consol_joined[page], page_access_counts_sampled_joined[page]};
 
 							//deal eviction if full capacity
 							if(pool_cap <= pages_in_pool){
@@ -751,7 +779,7 @@ int process_phase(){
 								i_cxi++;
 
 								// ANAND
-								evicted_pages_table_CI[evicted_page] = {100, ev_new_owner, ev_sharers};
+								evicted_pages_table_CI[evicted_page] = {100, ev_new_owner, ev_sharers, page_access_counts_consol_joined[page], page_access_counts_sampled_joined[page]};
 
 
 							}
@@ -766,7 +794,7 @@ int process_phase(){
 							migration_per_page_CI[page] = migration_per_page_CI[page] + 1;
 
 							// ANAND
-							migrated_pages_table_CI[page] = {old_owner, new_owner, sharers};
+							migrated_pages_table_CI[page] = {old_owner, new_owner, sharers, page_access_counts_consol_joined[page], page_access_counts_sampled_joined[page]};
 
 						}
 					}
@@ -892,7 +920,7 @@ int main(){
 
 	process_phase(); //do a single phase for warmup(page allocation)
 	//while(!any_trace_done){
-	for(int i=0;i<6;i++){ //putting a bound for now
+	for(int i=0;i<1000;i++){ //putting a bound for now
 		if(any_trace_done) break;
 		process_phase();
 	}
@@ -903,3 +931,4 @@ int main(){
 	return 0;
 
 }
+

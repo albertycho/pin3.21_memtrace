@@ -44,10 +44,10 @@ FILE * trace[N_THR];
 
 omp_lock_t page_W_lock;
 omp_lock_t page_R_lock;
-omp_lock_t page_owner_lock;
-omp_lock_t page_owner_CI_lock;
-omp_lock_t hop_hist_lock;
-omp_lock_t hop_hist_CI_lock;
+//omp_lock_t page_owner_lock;
+//omp_lock_t page_owner_CI_lock;
+//omp_lock_t hop_hist_lock;
+//omp_lock_t hop_hist_CI_lock;
 
 vector<unordered_map<uint64_t, uint64_t>> page_access_counts_dummy;
 // vector<unordered_map<uint64_t, uint64_t>> page_access_counts_R(N_THR);
@@ -57,15 +57,19 @@ vector<unordered_map<uint64_t, uint64_t>> page_access_counts_dummy;
 //unordered_map<uint64_t, uint64_t> page_Ws;
 unordered_map<uint64_t, uint64_t> page_owner;
 unordered_map<uint64_t, uint64_t> page_owner_CI;
+
 uint64_t pages_in_pool = 0;
 
 unordered_map<uint64_t, uint64_t> migration_per_page;
 unordered_map<uint64_t, uint64_t> migration_per_page_CI;
 
 //// for tracking access stats from past 1 billion insts
+// phase->thread->(page_number, number of accesses) - TODO: Confirm this!
 vector<vector<unordered_map<uint64_t, uint64_t>>> page_access_counts_history={};
 vector<vector<unordered_map<uint64_t, uint64_t>>> page_access_counts_R_history={};
 vector<vector<unordered_map<uint64_t, uint64_t>>> page_access_counts_W_history={};
+
+// phase (presetly just length 1 because HISTORY_LEN=1) ->(page_number, number of accesses) - TODO: Confirm this!
 vector<unordered_map<uint64_t, uint64_t>> page_Rs_history={};
 vector<unordered_map<uint64_t, uint64_t>> page_Ws_history={};
 
@@ -86,14 +90,29 @@ int process_phase(){
 	phase_end_cycle=phase_end_cycle+PHASE_CYCLES;
 	//page accesses
 	//vector<unordered_map<uint64_t, uint64_t>> page_access_counts={};
+	// sockets->(page_id, number_of_accesses)
 	vector<unordered_map<uint64_t, uint64_t>> page_access_counts(N_SOCKETS);
 	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_R(N_SOCKETS);
 	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_W(N_SOCKETS);
 	
+	// sampled down version of page_access_counts: ANAND
+	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_sampled(N_SOCKETS);
+	unordered_map<uint64_t, uint64_t> page_access_counts_sampled_joined;
+
+	// threads->(page_id, number_of_accesses)
 	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_per_thread(N_THR);
 	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_R_per_thread(N_THR);
 	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_W_per_thread(N_THR);
 
+	// sampled down version of page_access_counts_per_thread: ANAND
+	vector<unordered_map<uint64_t, uint64_t>> page_access_counts_per_thread_sampled(N_THR);
+
+	// ANAND - <page_id, <old_owner, new_owner, number_of_sharers>>
+	unordered_map<uint64_t, array<uint64_t, 3>> migrated_pages_table;
+	unordered_map<uint64_t, array<uint64_t, 3>> migrated_pages_table_CI;
+	unordered_map<uint64_t, array<uint64_t, 3>> evicted_pages_table_CI;
+
+	// (page_id, number of accesses)
 	//list of all unique pages and their sharer count
 	unordered_map<uint64_t, uint64_t> page_sharers={};
 	//list of all unique pags and their R/W count
@@ -102,6 +121,7 @@ int process_phase(){
 
 	std::multiset<std::pair<uint64_t, uint64_t>, migration_compare> sorted_candidates;
 
+	// no output files generated from this
 	// list of links (track traffic per link)
 	U64 link_traffic_R[N_SOCKETS][N_SOCKETS]={0};
 	U64 link_traffic_W[N_SOCKETS][N_SOCKETS]={0};
@@ -110,6 +130,7 @@ int process_phase(){
 	U64	CI_traffic_R[N_SOCKETS]={0};
 	U64	CI_traffic_W[N_SOCKETS]={0};
 
+	// no output files generated from this
 	// traffic at memory controller on each ndoe
 	U64 mem_traffic[N_SOCKETS]={0};
 	U64 mem_traffic_CI[N_SOCKETS]={0};
@@ -117,6 +138,7 @@ int process_phase(){
 	U64 migrated_pages=0;
 	U64 migrated_pages_CI=0;
 	U64 pages_to_CI=0;
+
 
 	//Histograms
 	uint64_t hist_access_sharers[N_SOCKETS_OFFSET]={0};
@@ -126,6 +148,7 @@ int process_phase(){
 	uint64_t hist_page_sharers[N_SOCKETS_OFFSET]={0};
 	uint64_t hist_page_sharers_R[N_SOCKETS_OFFSET]={0};
 	uint64_t hist_page_sharers_W[N_SOCKETS_OFFSET]={0};
+	// TODO: Why is this 10 here?
 	uint64_t hist_page_shareres_nacc[10][N_SOCKETS_OFFSET]={0};
 
 	uint64_t hop_hist_W[N_SOCKETS_OFFSET][4]={0};
@@ -157,18 +180,47 @@ int process_phase(){
 		unordered_map<uint64_t, uint64_t> page_Rs_tmp;
 		unordered_map<uint64_t, uint64_t> page_Ws_tmp;
 
+		// create a sampled down version of above map: ANNAD
+		unordered_map<uint64_t, uint64_t> pa_count_sampled;
+		// unordered_map<uint64_t, uint64_t> pa_count_R_sampled;
+		// unordered_map<uint64_t, uint64_t> pa_count_W_sampled;
+		// unordered_map<uint64_t, uint64_t> page_Rs_tmp_sampled;
+		// unordered_map<uint64_t, uint64_t> page_Ws_tmp_sampled;
+
+		// create a map for instruction when page was updated: ANAND
+		unordered_map<uint64_t, uint64_t> pa_count_sampled_last_ins;
+
+		// use this counter for modulo with SAMPLING_PERIOD
+		// uint64_t readline_counter = 0;
+
 		char buffer[8];
+
+		// read the first address
 		uint64_t buf_val;
 		size_t readsize = read_8B_line(&buf_val, buffer, trace[i]);
+		// ANAND
+		assert(readsize==8);
+
+		// ANAND
+		//read the first instruction
+		uint64_t icount_val;
+		readsize = read_8B_line(&icount_val, buffer, trace[i]);
+		uint64_t first_icount_val = icount_val;
+
 		while(readsize==8){
+
 			if(buf_val==0xc0ffee){ // 1B inst phase done
-				read_8B_line(&buf_val, buffer, trace[i]);
-				if(buf_val>=phase_end_cycle){
+				// ANAND: no need to read here again
+				// read_8B_line(&buf_val, buffer, trace[i]);
+				if(icount_val>=phase_end_cycle){
 					//cout<<"inst count: "<<buf_val<<endl;
 					break;
 				}
 				else{
 					readsize = read_8B_line(&buf_val, buffer, trace[i]);
+					assert(readsize==8);
+					readsize = read_8B_line(&icount_val, buffer, trace[i]);
+					assert(readsize==8);
 					continue;
 				}
 			}
@@ -182,14 +234,15 @@ int process_phase(){
 
 			//not doing anything with ins count in this script for now
 			//just read and discard
-			U64 icount_val=0;
-			read_8B_line(&icount_val, buffer, trace[i]);
+			// ANAND
+			//U64 icount_val=0;
+			//read_8B_line(&icount_val, buffer, trace[i]);
 			//cout<<"page: "<<page<<" icount: "<<icount_val<<endl;
-			if(icount_val>=phase_end_cycle){
+			//if(icount_val>=phase_end_cycle){
 				//TODO set flag to break while loop
 				//let's just break... missing one access is fine
-				break;
-			}
+				//break;
+			//}
 
 
 			// add to page access count
@@ -225,9 +278,23 @@ int process_phase(){
 				//omp_unset_lock(&page_R_lock);
 			}
 
+			// sample memory accesses with sampling period
+			// pa_count_sampled, pa_count_R_sampled, pa_count_W_sampled
+			// pa_count_sampled_last_ins
+
+			if (!check_in_same_sampling_period(pa_count_sampled_last_ins[page], icount_val, first_icount_val)){
+				pa_count_sampled[page] = pa_count_sampled[page] + 1;
+				pa_count_sampled_last_ins[page] = icount_val;
+				assert(pa_count_sampled[page] < NBILLION/SAMPLING_PERIOD);
+			}
 			
 			readsize = read_8B_line(&buf_val, buffer, trace[i]);
+			assert(readsize==8);
+			readsize = read_8B_line(&icount_val, buffer, trace[i]);
+			assert(readsize==8);
+
 		}
+
 		if(readsize!=8){
 			any_trace_done=true;
 		}
@@ -238,6 +305,7 @@ int process_phase(){
 		#pragma omp critical
 		{
 			page_access_counts_per_thread[i]=pa_count;
+			page_access_counts_per_thread_sampled[i]=pa_count_sampled;
 			page_access_counts_W_per_thread[i]=(pa_count_W);
 			page_access_counts_R_per_thread[i]=(pa_count_R);
 			misc_log_full<<"t_"<<i<<" accesses this phase: "<<tmp_numacc<<endl;
@@ -274,6 +342,14 @@ int process_phase(){
 		}
 	}
 
+	// ANAND
+	// No need to consolidate this over history as HISTORY_LEN = 1
+	for(uint64_t ii=0; ii<N_THR; ii++){
+		uint64_t socketid = ii>>2; //4 cores per socket
+		for(const auto& pt : page_access_counts_per_thread_sampled[ii]){
+			page_access_counts_sampled[socketid][pt.first]=page_access_counts_sampled[socketid][pt.first]+pt.second;
+		}
+	}
 
 	/* @@@ following is legacy code from when making migration decsion for 100M instruction phase, based on profiling info from past 1B instructions
 	 */
@@ -302,6 +378,10 @@ int process_phase(){
 	unordered_map<uint64_t, uint64_t> page_Rs_consol={};
 	unordered_map<uint64_t, uint64_t> page_Ws_consol={};
 	
+	// sampled down version
+	// vector<unordered_map<uint64_t, uint64_t>> page_access_counts_consol_sampled(N_SOCKETS);
+	// this will be equal to page_access_counts_sampled(N_SOCKETS) because HISTORY_LEN is 1
+
 	#pragma omp parallel for
 	for(uint64_t ii=0;ii<N_SOCKETS;ii++){
 		for(uint64_t jj=0;jj<page_access_counts_history.size();jj++){
@@ -330,6 +410,7 @@ int process_phase(){
 		}
 	}
 	
+	// calculate page sharers using page_access_counts_consol (consilated per socket)
 	unordered_map<uint64_t, uint64_t> page_sharers_long={};
 	for (const auto& pa_c : page_access_counts_consol) {
 		for (const auto& ppair : pa_c) {
@@ -345,7 +426,11 @@ int process_phase(){
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// log sharers for each page for this phase
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	for (const auto& pa_c : page_access_counts) {
+	// ANAND
+	// for (const auto& pa_c : page_access_counts) {
+	// No need to change here as even a single page access will be documented in the page_access_count_sampled
+	// changed for consistency
+	for (const auto& pa_c : page_access_counts_sampled) {
 		for (const auto& ppair : pa_c) {
 			U64 page = ppair.first;
 			page_sharers[page]=page_sharers[page]+1;
@@ -357,9 +442,33 @@ int process_phase(){
 	// sort pages in order of accesses in sorted_candidates
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	//cout<<"page_Rs size: "<<page_Rs.size()<<endl;
-	for (const auto& ppair : page_Rs_consol){
+	// ANAND
+	// for (const auto& ppair : page_Rs_consol){
+	// 	U64 page = ppair.first;
+	// 	U64 accs = ppair.second + page_Ws_consol[page];
+	// 	//TODO can probably skip pages that have low accs, like < 100
+	// 	//if(accs>100){
+	// 	//dumping everything - for evictino from pool
+	// 		sorted_candidates.insert({page, accs});
+	// 	//}
+	// }
+
+
+
+	// ANAND
+
+	// page_access_counts_sampled_joined
+	for (const auto& pa_c : page_access_counts_sampled) {
+		for (const auto& ppair : pa_c) {
+			U64 page = ppair.first;
+			page_access_counts_sampled_joined[page]=page_access_counts_sampled_joined[page]+ppair.second;
+		}
+	}
+	
+	for (const auto& ppair : page_access_counts_sampled_joined){
 		U64 page = ppair.first;
-		U64 accs = ppair.second + page_Ws_consol[page];
+		U64 accs = ppair.second;
+		//U64 accs = ppair.second + page_Ws_consol[page];
 		//TODO can probably skip pages that have low accs, like < 100
 		//if(accs>100){
 		//dumping everything - for evictino from pool
@@ -403,12 +512,17 @@ int process_phase(){
 			U64 owner=i;
 			auto pp_it = page_owner.find(page);
 			if(pp_it==page_owner.end()){ //new page first touch
+				// ANAND: Below comment is old
 				// this will favor thread 0. 
 				// should be ok after the first phase..
 				unordered_map<uint64_t, uint64_t> pa_count;
 				vector<uint64_t> sharers = {};
 				uint64_t jj = 0;
-				for (const auto& pa_c : page_access_counts) {
+				// ANAND
+				// for (const auto& pa_c : page_access_counts) {
+				// Again no need to change here as we are not using the actual count, just the page id
+				// changed for consistency
+				for (const auto& pa_c : page_access_counts_sampled) {
 					if (pa_c.find(page) != pa_c.end()) {
 						sharers.push_back(jj);
 					}
@@ -512,7 +626,7 @@ int process_phase(){
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 	// Reassign owners (Equivalent to "Algorithm 1")
 	//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-if(LIMIT_MIGRATION){
+	if(LIMIT_MIGRATION){
 		uint64_t pingpong_lim = curphase / 4;
 		uint64_t pool_cap = (page_owner_CI.size())/POOL_FRACTION;
 		auto it_migration = sorted_candidates.begin();
@@ -527,7 +641,7 @@ if(LIMIT_MIGRATION){
 			U64 most_acc=0;
 			U64 new_owner=INVAL_OWNER;
 			U64 sharers = page_sharers_long[page];
-			//ssign random owner among sharers for pages with +8 sharers (if the page is not going to pool)
+			//assign random owner among sharers for pages with +8 sharers (if the page is not going to pool)
 			if(sharers>=8){
 				new_owner=rand()%N_SOCKETS;
 
@@ -535,8 +649,15 @@ if(LIMIT_MIGRATION){
 			}
 			else{
 				for(U64 j=0; j<N_SOCKETS;j++){
-					if(page_access_counts_consol[j][page]>most_acc){
-						most_acc = page_access_counts[j][page];
+					// ANAND
+					//if(page_access_counts_consol[j][page]>most_acc){
+					//	most_acc = page_access_counts[j][page];
+					//	new_owner=j;
+					//}
+
+					// ANAND
+					if(page_access_counts_sampled[j][page]>most_acc){
+						most_acc = page_access_counts_sampled[j][page];
 						new_owner=j;
 					}
 				}
@@ -554,6 +675,10 @@ if(LIMIT_MIGRATION){
 						migrated_pages++;
 						page_owner[page] = new_owner;
 						migration_per_page[page] = migration_per_page[page] + 1;
+
+						// ANAND
+						migrated_pages_table[page] = {old_owner, new_owner, sharers};
+
 					}
 				}
 			}
@@ -570,6 +695,10 @@ if(LIMIT_MIGRATION){
 							i_cxi++;
 							page_owner_CI[page] = CXO;
 							migration_per_page_CI[page] = migration_per_page_CI[page] + 1;
+
+							// ANAND
+							migrated_pages_table_CI[page] = {old_owner, new_owner, sharers};
+
 							//deal eviction if full capacity
 							if(pool_cap <= pages_in_pool){
 								//std::cout<<"DBG: is pool_cap being hit?"<<endl;
@@ -600,9 +729,17 @@ if(LIMIT_MIGRATION){
 
 								}
 								else{
+									// ANAND
+									// for(U64 j=0; j<N_SOCKETS;j++){
+									// 	if(page_access_counts_consol[j][evicted_page]>ev_most_acc){
+									// 		ev_most_acc = page_access_counts[j][evicted_page];
+									// 		ev_new_owner=j;
+									// 	}
+									// }
+
 									for(U64 j=0; j<N_SOCKETS;j++){
-										if(page_access_counts_consol[j][evicted_page]>ev_most_acc){
-											ev_most_acc = page_access_counts[j][evicted_page];
+										if(page_access_counts_sampled[j][evicted_page]>ev_most_acc){
+											ev_most_acc = page_access_counts_sampled[j][evicted_page];
 											ev_new_owner=j;
 										}
 									}
@@ -612,6 +749,10 @@ if(LIMIT_MIGRATION){
 								page_owner_CI[evicted_page] = ev_new_owner;
 								pages_in_pool--;
 								i_cxi++;
+
+								// ANAND
+								evicted_pages_table_CI[evicted_page] = {100, ev_new_owner, ev_sharers};
+
 
 							}
 						}
@@ -623,6 +764,10 @@ if(LIMIT_MIGRATION){
 							page_owner_CI[page] = new_owner;
 							i_cxi++;
 							migration_per_page_CI[page] = migration_per_page_CI[page] + 1;
+
+							// ANAND
+							migrated_pages_table_CI[page] = {old_owner, new_owner, sharers};
+
 						}
 					}
 				}
@@ -680,6 +825,17 @@ if(LIMIT_MIGRATION){
 	cout<<"link traffic between 5 and 12: "<< linktraffic_5_12_CI<<endl;
 	cout<<"traffic to CI from a single node(5): "<<CI_traffic_R[5]+CI_traffic_W[5]<<endl;
 
+	auto sorted_candidates_it = sorted_candidates.begin();
+	cout<<"Sampled access top 1 " << sorted_candidates_it->first << " " << sorted_candidates_it->second << endl;
+	sorted_candidates_it++;
+	cout<<"Sampled access top 2 " << sorted_candidates_it->first << " " << sorted_candidates_it->second << endl;
+	sorted_candidates_it++;
+	cout<<"Sampled access top 3 " << sorted_candidates_it->first << " " << sorted_candidates_it->second << endl;
+	sorted_candidates_it++;
+	cout<<"Sampled access top 4 " << sorted_candidates_it->first << " " << sorted_candidates_it->second << endl;
+	sorted_candidates_it++;
+	cout<<"Sampled access top 5 " << sorted_candidates_it->first << " " << sorted_candidates_it->second << endl;
+
 	// @@@@@ saving stat tracking files
 	savearray(hist_access_sharers, N_SOCKETS_OFFSET,"access_hist.txt\0");
 	savearray(hist_access_sharers_W, N_SOCKETS_OFFSET,"access_hist_W.txt\0");
@@ -698,6 +854,10 @@ if(LIMIT_MIGRATION){
 	save_hophist(hop_hist_RO_CI,N_SOCKETS_OFFSET, "hop_hist_RO_CI.txt\0");
 	save_hophist(hop_hist_RtoRW_CI,N_SOCKETS_OFFSET, "hop_hist_RtoRW_CI.txt\0");
 
+	// ANAND
+	save_uo_array_map(migrated_pages_table,"migrated_pages_table.txt\0");
+	save_uo_array_map(migrated_pages_table_CI,"migrated_pages_table_CI.txt\0");
+	save_uo_array_map(evicted_pages_table_CI,"evicted_pages_table_CI.txt\0");
 	
 	curphase=curphase+1;
 	return 0;
@@ -707,10 +867,10 @@ int main(){
 
 	omp_init_lock(&page_W_lock);
 	omp_init_lock(&page_R_lock);
-	omp_init_lock(&page_owner_lock);
-	omp_init_lock(&page_owner_CI_lock);
-	omp_init_lock(&hop_hist_lock);
-	omp_init_lock(&hop_hist_CI_lock);
+	//omp_init_lock(&page_owner_lock);
+	//omp_init_lock(&page_owner_CI_lock);
+	//omp_init_lock(&hop_hist_lock);
+	//omp_init_lock(&hop_hist_CI_lock);
 	
 	assert(HISTORY_LEN >=1);
 	
@@ -732,7 +892,7 @@ int main(){
 
 	process_phase(); //do a single phase for warmup(page allocation)
 	//while(!any_trace_done){
-	for(int i=0;i<10000;i++){ //putting a bound for now
+	for(int i=0;i<6;i++){ //putting a bound for now
 		if(any_trace_done) break;
 		process_phase();
 	}

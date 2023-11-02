@@ -47,6 +47,9 @@
 #define POOL_FRACTION 5
 //#define POOL_FRACTION 17
 
+// ANAND
+#define SAMPLING_PERIOD 10000000
+
 using namespace std;
 
 U64 curphase;
@@ -68,7 +71,7 @@ int read_8B_line(uint64_t * buf_val, char* buffer, FILE* fptr){
 string generate_phasedirname(){
 	stringstream ss;
 	//ss<<"PP_1B_32K_4_Phase"<<curphase;
-	ss<<"PP_1B_512K_4_Phase"<<curphase;
+	ss<<"Anand_Oct9/1B_512K_4_10M/Anand_1B_512K_4_Sampled_10M_Phase"<<curphase;
 	//ss<<"1BPhase"<<curphase;
 	//ss<<"100MPhase"<<curphase;
 	//ss<<"10MPhase"<<curphase;
@@ -178,6 +181,24 @@ int save_uo_map(const std::unordered_map<uint64_t, uint64_t> smap, const string 
 	
 }
 
+int save_uo_array_map(const std::unordered_map<uint64_t, std::array<uint64_t, 3>> smap, const string savefilename){
+	string savefilename_full=generate_full_savefilename(savefilename);
+	std::ofstream file(savefilename_full);
+	if (!file.is_open()) {
+    	std::cerr << "Failed to open file: " << savefilename_full << std::endl;
+    	return -1;
+  	}
+	
+	for (const auto& pair : smap) {
+        file << pair.first << ' ' << pair.second[0] << ' ' << pair.second[1] << ' ' << pair.second[2] << '\n';
+    }
+
+	file.close();
+	return 0;
+	
+}
+
+
 int save_hophist(U64 arr[][4], U64 arrsize, string savefilename){
 	//std::ofstream file(savefilename);
 	string savefilename_full=generate_full_savefilename(savefilename);
@@ -198,6 +219,25 @@ int save_hophist(U64 arr[][4], U64 arrsize, string savefilename){
 
     file.close();
 	return 0;
+}
+
+bool check_in_same_sampling_period(U64 a, U64 b, U64 first_icount_val){
+	if (a == 0){
+		return false;
+	}
+
+	U64 a_shifted = a - first_icount_val;
+	U64 b_shifted = b - first_icount_val;
+
+	// a < b is given
+	U64 multiple = a_shifted/SAMPLING_PERIOD;
+
+	if (b_shifted >= (multiple+1)*SAMPLING_PERIOD){
+		return false;
+	}
+	else{
+		return true;
+	}
 }
 
 U64 gethop(U64 a, U64 b){

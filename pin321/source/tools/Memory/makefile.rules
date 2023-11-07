@@ -25,7 +25,7 @@
 TEST_TOOL_ROOTS := icache dcache allcache dcache_xscale_config footprint memalign address_mapping address_mapping_probe \
                    memory_limit malloc_stress memtrace memtrace_intext champsim_tracer_w_magic_killwhendone \
 		   combined_tracer combined_tracer_20B combined_tracer_40B combined_tracer_1cstrace combined_tracer_dbg icount_w_magic \
-		   memtrace_nocache
+		   memtrace_nocache combined_tracer_40B_dumpextrachampsimtrace
 
 # This defines the tests to be run that were not already defined in TEST_TOOL_ROOTS.
 TEST_ROOTS := memory_allocation_access_protection new_delete address_mapping_oom address_mapping_zero check_memory_access \

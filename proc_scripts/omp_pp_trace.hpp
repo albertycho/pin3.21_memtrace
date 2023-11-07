@@ -20,8 +20,10 @@
 #include <sys/stat.h> 
 #include <sys/types.h> 
 
-#define PAGESIZE 4096
-#define PAGEBITS 12
+//#define PAGESIZE 4096
+//#define PAGEBITS 12
+#define PAGESIZE 64
+#define PAGEBITS 6
 #define N_THR 64
 #define N_SOCKETS 16
 //#define THR_OFFSET_VAL 2
@@ -31,7 +33,7 @@
 #define U64 uint64_t
 #define CXO 100 //CXL Island is owner
 //#define SHARER_THRESHOLD 8
-#define SHARER_THRESHOLD 2
+#define SHARER_THRESHOLD 8
 #define INVAL_OWNER 9999
 
 #define NBILLION 1000000000
@@ -69,7 +71,9 @@ int read_8B_line(uint64_t * buf_val, char* buffer, FILE* fptr){
 string generate_phasedirname(){
 	stringstream ss;
 	//ss<<"PP_1B_32K_4_Phase"<<curphase;
-	ss<<"PP_1B_32K_4_2sharer_Phase"<<curphase;
+	//ss<<"PP_1B_32K_4_2sharer_Phase"<<curphase;
+	//ss<<"PP_1B_32K_4_2sharer_Phase"<<curphase;
+	ss<<"PP_1B_32K_4_64BPage_Phase"<<curphase;
 	//ss<<"PP_1B_512K_4_Phase"<<curphase;
 	//ss<<"1BPhase"<<curphase;
 	//ss<<"100MPhase"<<curphase;

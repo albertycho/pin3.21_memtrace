@@ -6,8 +6,8 @@
 #include <filesystem>
 
 #define MIGRATION_LIMIT 2048
-#define INPUT_BASE_NAME "2B_64K_4_2sharers_Phase"
-#define OUTPUT_BASE_NAME "pagemaps_2B_2K_4_2sharers/";
+#define INPUT_BASE_NAME "PP_TS_1G_200M_20K_4_Phase"
+#define OUTPUT_BASE_NAME "pagemaps_TS_1G_2K_4/";
 
 std::map<uint64_t, uint64_t> read_page_owner(const std::string &dir) {
     std::ifstream file(dir + "/page_owner.txt");
@@ -61,7 +61,10 @@ int main() {
             for (const auto &pair : page_map2) {
                 uint64_t page_number = pair.first;
                 uint64_t owner2 = pair.second;
-                uint64_t owner1 = page_map1[page_number];
+                uint64_t owner1 = owner2;
+				if (page_map1.count(page_number) > 0) {
+	                owner1 = page_map1[page_number];
+				}
 
                 if (owner1 == owner2) {
                     new_page_map[page_number] = owner2;
@@ -100,7 +103,10 @@ int main() {
             for (const auto &pair : page_map2) {
                 uint64_t page_number = pair.first;
                 uint64_t owner2 = pair.second;
-                uint64_t owner1 = page_map1[page_number];
+                uint64_t owner1 = owner2;
+				if (page_map1.count(page_number) > 0) {
+	                owner1 = page_map1[page_number];
+				}
 
                 if (owner1 == owner2) {
                     new_page_map[page_number] = owner2;

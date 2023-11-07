@@ -41,14 +41,15 @@
 //// for ones that take too long
 #define PHASE_CYCLES 1000000000
 //#define MIGRATION_LIMIT 262144
-#define MIGRATION_LIMIT 524288
+//#define MIGRATION_LIMIT 524288
 //#define MIGRATION_LIMIT 32768
+#define MIGRATION_LIMIT 20000
 
 #define POOL_FRACTION 5
 //#define POOL_FRACTION 17
 
 // ANAND
-#define SAMPLING_PERIOD 100000
+#define SAMPLING_PERIOD 200000000
 
 using namespace std;
 
@@ -71,7 +72,8 @@ int read_8B_line(uint64_t * buf_val, char* buffer, FILE* fptr){
 string generate_phasedirname(){
 	stringstream ss;
 	//ss<<"PP_1B_32K_4_Phase"<<curphase;
-	ss<<"Anand_Oct9/1B_512K_4_100K/Anand_1B_512K_4_Sampled_100K_Phase"<<curphase;
+	//ss<<"Anand_Oct9/1B_512K_4_100K/Anand_1B_512K_4_Sampled_100K_Phase"<<curphase;
+	ss<<"PP_TS_1G_200M_20K_4_Phase"<<curphase;
 	//ss<<"1BPhase"<<curphase;
 	//ss<<"100MPhase"<<curphase;
 	//ss<<"10MPhase"<<curphase;

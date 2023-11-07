@@ -105,11 +105,13 @@ int main() {
                 if (owner1 == owner2) {
                     new_page_map[page_number] = owner2;
                 } else {
+                    input_diff++;
                     uint64_t rand_val = rand() % 10;
                     if(rand_val <9) {
                         // map to owner of Phase1
                         new_page_map[page_number] = owner2; // or owner2, based on randomness
                     } else {
+                        output_diff++;
                         // map to owner of Phase0
                         new_page_map[page_number] = owner1; // or owner2, based on randomness
                     }

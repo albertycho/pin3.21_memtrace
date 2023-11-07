@@ -54,9 +54,6 @@ int main() {
             auto page_map1 = read_page_owner(base + std::to_string(i));
             auto page_map2 = read_page_owner(base + std::to_string(i+1));
             std::map<uint64_t, uint64_t> new_page_map;
-            
-            uint64_t input_diff = 0;
-            uint64_t output_diff = 0;
 
             for (const auto &pair : page_map2) {
                 uint64_t page_number = pair.first;
@@ -66,22 +63,21 @@ int main() {
                 if (owner1 == owner2) {
                     new_page_map[page_number] = owner2;
                 } else {
-                    input_diff++;
-                    uint64_t rand_val = rand() % 10;
-                    if(rand_val <9) {
+                    uint64_t rand_val = rand() % 32;
+                    if(rand_val <31) {
+                    //uint64_t rand_val = rand() % 16;
+                    //if(rand_val <15) {
                         // map to owner of Phase1
                         new_page_map[page_number] = owner2; // or owner2, based on randomness
                     } else {
                         //std::cout<<"does this happen?"<<std::endl;
                         // map to owner of Phase0
-                        output_diff++;
                         new_page_map[page_number] = owner1; // or owner2, based on randomness
                     }
 
                     //
                 }
             }
-            std::cout<<"phase"<<i<<" input_diff: "<<input_diff<<", output_diff: "<<output_diff<<", LIM: "<<MIGRATION_LIMIT<<std::endl;
 
             std::string new_dir = output_base+"phase" + std::to_string(i+1) + "_pagemaps";
             //std::string new_dir = "phase" + std::to_string(i+1) + "_pagemaps_CI";
@@ -96,7 +92,7 @@ int main() {
             auto page_map1 = read_page_owner_CI(base + std::to_string(i));
             auto page_map2 = read_page_owner_CI(base + std::to_string(i+1));
             std::map<uint64_t, uint64_t> new_page_map;
-            uint64_t input_diff=0, output_diff = 0;
+
             for (const auto &pair : page_map2) {
                 uint64_t page_number = pair.first;
                 uint64_t owner2 = pair.second;
@@ -105,11 +101,14 @@ int main() {
                 if (owner1 == owner2) {
                     new_page_map[page_number] = owner2;
                 } else {
-                    uint64_t rand_val = rand() % 10;
-                    if(rand_val <9) {
+                    uint64_t rand_val = rand() % 32;
+                    if(rand_val <31) {
+                    //uint64_t rand_val = rand() % 16;
+                    //if(rand_val <15) {
                         // map to owner of Phase1
                         new_page_map[page_number] = owner2; // or owner2, based on randomness
                     } else {
+                        //std::cout<<"does this happen?"<<std::endl;
                         // map to owner of Phase0
                         new_page_map[page_number] = owner1; // or owner2, based on randomness
                     }
@@ -117,7 +116,6 @@ int main() {
                     //
                 }
             }
-            std::cout<<"phase"<<i<<" input_diff: "<<input_diff<<", output_diff: "<<output_diff<<", LIM: "<<MIGRATION_LIMIT<<std::endl;
 
             //std::string new_dir = "phase" + std::to_string(i+1) + "_pagemaps";
             std::string new_dir = output_base+"phase" + std::to_string(i+1) + "_pagemaps_CI";

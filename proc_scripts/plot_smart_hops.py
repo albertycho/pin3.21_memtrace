@@ -35,7 +35,7 @@ plt.rcParams.update({'font.size': 14})
 labelfontsize=20
 # Create the figure and the axes
 #fig, ax = plt.subplots(figsize=(10, 5))
-fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(10, 6))  # Adjust the figure size as needed
+fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(3, 6))  # Adjust the figure size as needed
 
 base_amats=[0]*len(base_values)
 cxi_amats =[0]*len(cxi_values)

@@ -82,7 +82,8 @@ int main() {
             //std::string new_dir = "phase" + std::to_string(i+1) + "_pagemaps_CI";
             std::filesystem::create_directory(new_dir);
             //write_page_owner(new_page_map, new_dir);
-            std::filesystem::copy(base + std::to_string(i) + "/page_owner.txt", new_dir + "/page_owner_pre.txt");
+            //std::filesystem::copy(base + std::to_string(i) + "/page_owner.txt", new_dir + "/page_owner_pre.txt");
+            std::filesystem::copy(base + std::to_string(i+1) + "/page_owner.txt", new_dir + "/page_owner_pre.txt");
             std::filesystem::copy(base + std::to_string(i+1) + "/page_owner.txt", new_dir + "/page_owner_post.txt");
             //std::filesystem::copy(base + std::to_string(i+1) + "/page_owner_CI.txt", new_dir + "/page_owner_post.txt");
         }

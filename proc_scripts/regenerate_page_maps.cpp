@@ -5,9 +5,12 @@
 #include <random>
 #include <filesystem>
 
-#define MIGRATION_LIMIT 2048
-#define INPUT_BASE_NAME "PP_TS_1G_200M_20K_4_Phase"
-#define OUTPUT_BASE_NAME "pagemaps_TS_1G_2K_4/";
+//#define MIGRATION_LIMIT 2048
+//#define INPUT_BASE_NAME "PP_TS_1G_200M_20K_4_Phase"
+//#define OUTPUT_BASE_NAME "pagemaps_TS_1G_2K_4/";
+#define MIGRATION_LIMIT 8192
+#define INPUT_BASE_NAME "PP_TS_1G_200M_80K_4_Phase"
+#define OUTPUT_BASE_NAME "pagemaps_TS_1G_8K_4/";
 
 std::map<uint64_t, uint64_t> read_page_owner(const std::string &dir) {
     std::ifstream file(dir + "/page_owner.txt");

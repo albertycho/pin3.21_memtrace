@@ -544,6 +544,7 @@ int process_phase(){
 				uint64_t ri = rand() % sharers.size();
 				owner = sharers[ri];
 				page_owner[page]=owner; 
+				page_owner_CI[page]=owner; // also first encounter for CI
 				
 			}
 			else{
@@ -567,10 +568,19 @@ int process_phase(){
 			U64 owner_CI=i;
 			auto pp_it_CI = page_owner_CI.find(page);
 			if(pp_it_CI==page_owner_CI.end()){
-				// this will favor thread 0. 
-				// should be ok after the first phase..
-				page_owner_CI[page]=i; 
-				owner_CI=i;
+				//shoudln't get here
+				cout<<"code can't get here"<<endl;
+				vector<uint64_t> sharers = {};
+				uint64_t jj = 0;
+				for (const auto& pa_c : page_access_counts) {
+					if (pa_c.find(page) != pa_c.end()) {
+						sharers.push_back(jj);
+					}
+					jj++;
+				}
+				uint64_t ri = rand() % sharers.size();
+				owner_CI = sharers[ri];
+				page_owner_CI[page]=owner_CI;
 			}
 			else{
 				owner_CI=pp_it_CI->second;

@@ -32,7 +32,7 @@ benchmarks.append('')
 benchmarks.append('')
 ##############################################################################
 
-bar_width = 0.22  # The width of the bars
+bar_width = 0.1  # The width of the bars
 spacing = 0.02  # The spacing between bars
 n_benchmarks = len(benchmarks)
 indices = np.arange(n_benchmarks)
@@ -40,15 +40,14 @@ indices = np.arange(n_benchmarks)
 # Colors for the bars
 #colors = ['tab:green', 'tab:blue', 'tab:red', 'tab:purple']
 #colors=['#dda0dd', '#8fbc8f', '#faa460', '#9370db']
-#colors=['#dda0dd', '#8fbc8f', '#faa460', '#9370db','lightyellow','aliceblue']
-#colors=['#dda0dd', '#8fbc8f', '#faa460', '#9370db','lightyellow','#F59B8B']
-colors=['#dda0dd', '#8fbc8f', '#faa460', '#9370db','lightyellow','#BB979C']
+colors=['#dda0dd', '#8fbc8f', '#faa460', '#9370db','lightyellow','aliceblue']
 plt.rcParams.update({'font.size': 14})
 labelfontsize=20
+# Create the figure and the axes
+#fig, ax = plt.subplots(figsize=(10, 5))
+#fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(3, 6))  # Adjust the figure size as needed
 
-#plt.figure(figsize=(10,3.5))
-plt.figure(figsize=(10,4))
-#fig, plt = plt.subplots(figsize=(10, 4))  
+fig, ax1 = plt.subplots(figsize=(10, 4))  
 base_amats=[0]*len(base_values)
 cxi_amats =[0]*len(cxi_values)
 
@@ -99,40 +98,46 @@ print(ctwohoprat_mean)
 bottom_values = [0] * len(base_values)
 for i, color in enumerate(colors):
     plotvals = [base[i] for base in base_values]
-    plt.bar(indices - bar_width * 0.75, plotvals, bar_width, color=color, alpha=1, bottom=bottom_values, edgecolor='black')
+    ax1.bar(indices - bar_width * 1.25, plotvals, bar_width, color=color, alpha=1, bottom=bottom_values, edgecolor='black')
     bottom_values = [a + b for a, b in zip(plotvals, bottom_values)]
 
 # Plot cxi bars
 cbottom_values = [0] * len(cxi_values)
 for i, color in enumerate(colors):
     plotvals = [cxi[i] for cxi in cxi_values]
-    plt.bar(indices + bar_width * 0.75, plotvals, bar_width, color=color, hatch='//', alpha=1, bottom=cbottom_values, edgecolor='black')
+    ax1.bar(indices + bar_width * 1.25, plotvals, bar_width, color=color, hatch='//', alpha=1, bottom=cbottom_values, edgecolor='black')
     cbottom_values = [a + b for a, b in zip(plotvals, cbottom_values)]
 # Adjust layout to prevent overlap
 plt.tight_layout()
-plt.subplots_adjust(left=0.2) 
-plt.ylim(0, 1.05)
 
 
-plt.xticks(indices, benchmarks,rotation=0)
+# Set the y-axis limits
+#ax1.set_ylim(0, 1.18)
+ax1.set_ylim(0, 1.05)
 
-plt.ylabel('Access Distribution', fontsize=labelfontsize)
+# Set the x-ticks and their labels
+ax1.set_xticks(indices)
+#ax1.set_ylabel('Access\nDistribution', fontsize=labelfontsize)
+ax1.set_ylabel('Access Distribution', fontsize=labelfontsize)
+ax1.set_xticklabels(benchmarks, rotation=0)
 
 # Grid and layout adjustments
-plt.grid(True, which='both', axis='y', linestyle='--', linewidth=0.5, zorder=0)
+ax1.grid(True, which='both', axis='y', linestyle='--', linewidth=0.5, zorder=0)
 
 # Create and set legend
 # ...
 legend_elements = [Patch(facecolor=color, label=headers[i+1].split('_')[-1], edgecolor='black') for i, color in enumerate(colors)]
+#legend_elements[3].label='CXL'
 legend_elements[3] = Patch(facecolor=legend_elements[3].get_facecolor(), label='Pool', edgecolor='black')
 legend_elements[0] = Patch(facecolor=legend_elements[0].get_facecolor(), label='Local', edgecolor='black')
-legend_elements[4] = Patch(facecolor=legend_elements[4].get_facecolor(), label='BT_Socket', edgecolor='black')
+legend_elements[4] = Patch(facecolor=legend_elements[4].get_facecolor(), label='BT_NoPool', edgecolor='black')
 legend_elements[5] = Patch(facecolor=legend_elements[5].get_facecolor(), label='BT_Pool', edgecolor='black')
-legend_elements.append(Patch(facecolor='white', label='Baseline',edgecolor='black'))
-legend_elements.append(Patch(facecolor='white', label='StarNUMA', hatch='//',edgecolor='black'))
+#legend_elements.append(Patch(facecolor='white', alpha=0, label=''))
+legend_elements.append(Patch(facecolor='grey', label='Baseline',edgecolor='black'))
+legend_elements.append(Patch(facecolor='grey', label='StarNUMA', hatch='//',edgecolor='black'))
 
-#plt.legend(handles=legend_elements, ncol=4, loc='upper center', bbox_to_anchor=(0.5,1.25))
-plt.legend(handles=legend_elements, ncol=1, loc='best')
+#ax1.legend(handles=legend_elements, ncol=4, loc='upper center', bbox_to_anchor=(0.5,1.25))
+ax1.legend(handles=legend_elements, ncol=1, loc='best')
 
 # Save the plot
 plt.savefig('accessdist.png', bbox_inches='tight')

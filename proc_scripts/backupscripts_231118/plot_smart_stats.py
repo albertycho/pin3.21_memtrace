@@ -56,8 +56,6 @@ arithmetic_mean_cxi_amats = np.mean(cxi_amats)
 arithmetic_mean_estimated_base_amats = np.mean(estimated_base_amats)
 arithmetic_mean_estimated_cxi_amats = np.mean(estimated_cxi_amats)
 
-print('base mean amat: '+str(arithmetic_mean_base_amats))
-print('snuma mean amat: '+str(arithmetic_mean_cxi_amats))
 
 
 # adding an empty slot before mean
@@ -95,7 +93,7 @@ print(base_amats)
 # Plot normalized IPCs
 plt.figure(figsize=(10, 4))
 barwidth=0.5
-plt.bar(benchmarks, normalized_IPCs, width=0.5, color='#9370db',edgecolor='black')
+plt.bar(benchmarks, normalized_IPCs, width=0.5, color='#9370db')
 plt.axhline(1, color='black', linestyle='--')
 plt.grid(axis='y', linestyle='--')
 plt.gca().set_axisbelow(True)  # Set grid behind
@@ -118,11 +116,11 @@ plt.figure(figsize=(10, 4))
 bar_width = 0.22
 index = range(len(benchmarks))
 
-plt.bar([i-bar_width*0.75 for i in index], base_amats, bar_width, label='Baseline', color=colors[0], edgecolor='black')
-plt.bar([i + bar_width*0.75 for i in index], cxi_amats, bar_width, label='StarNUMA', color=colors[0], hatch='//', edgecolor='black')
+plt.bar([i-bar_width*0.75 for i in index], base_amats, bar_width, label='Baseline', color=colors[0])
+plt.bar([i + bar_width*0.75 for i in index], cxi_amats, bar_width, label='StarNUMA', color=colors[0], hatch='//')
 
-plt.bar([i-bar_width*0.75 for i in index], estimated_base_amats, bar_width, label='Baseline', color=colors[1],  edgecolor='black')
-plt.bar([i + bar_width*0.75 for i in index], estimated_cxi_amats, bar_width, label='StarNUMA', color=colors[1], hatch='//', edgecolor='black')
+plt.bar([i-bar_width*0.75 for i in index], estimated_base_amats, bar_width, label='Baseline', color=colors[1])
+plt.bar([i + bar_width*0.75 for i in index], estimated_cxi_amats, bar_width, label='StarNUMA', color=colors[1], hatch='//')
 
 
 plt.grid(axis='y', linestyle='--')

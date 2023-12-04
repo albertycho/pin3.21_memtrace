@@ -40,9 +40,7 @@ indices = np.arange(n_benchmarks)
 # Colors for the bars
 #colors = ['tab:green', 'tab:blue', 'tab:red', 'tab:purple']
 #colors=['#dda0dd', '#8fbc8f', '#faa460', '#9370db']
-#colors=['#dda0dd', '#8fbc8f', '#faa460', '#9370db','lightyellow','aliceblue']
-#colors=['#dda0dd', '#8fbc8f', '#faa460', '#9370db','lightyellow','#F59B8B']
-colors=['#dda0dd', '#8fbc8f', '#faa460', '#9370db','lightyellow','#BB979C']
+colors=['#dda0dd', '#8fbc8f', '#faa460', '#9370db','lightyellow','aliceblue']
 plt.rcParams.update({'font.size': 14})
 labelfontsize=20
 

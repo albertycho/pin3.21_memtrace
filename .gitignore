@@ -34,3 +34,8 @@ proc_scripts/.vscode/*
 /.vs/slnx.sqlite-journal
 modified_anand/.vscode/*
 modified_anand/.vscode/
+modified_anand/omp_pp_trace_200M_20k_16
+modified_anand/omp_pp_trace_200M_80k_16
+proc_scripts/regenerate_page_maps_TS_2k_16
+proc_scripts/regenerate_page_maps_TS_8k_16
+

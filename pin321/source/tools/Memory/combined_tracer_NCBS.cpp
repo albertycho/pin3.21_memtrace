@@ -578,6 +578,8 @@ void ResetCurrentInstruction(VOID *ip, THREADID tid)
     }
     curr_instr[tid] = {};
     curr_instr[tid].ip = (unsigned long long int)ip;
+    // curr_instr[tid].isMsg = 1;
+    // curr_instr[tid].msgNode = 99;
 }
 static VOID InsRef(ADDRINT addr, THREADID tid) //TODO add threaID to arg
 {
@@ -702,6 +704,7 @@ static VOID pin_magic_inst(THREADID tid, ADDRINT value, ADDRINT field){
 	if(tid>=MAX_THREADS){
 		return;
 	}
+    // curr_instr[tid].msgNode = 99;
 
         switch(field){
             case 0x0: //ROI START
@@ -729,6 +732,22 @@ static VOID pin_magic_inst(THREADID tid, ADDRINT value, ADDRINT field){
             case 0x5: //Print Instruction count (dbg, setting FF, etc)
                 std::cout<<"TRACER: MI-5 - Ins Count: "<<ins_count[tid]<<std::endl;
                 break;
+            case 0xA: //Indicates the start of MPI_Send
+                curr_instr[tid].isMsg = 1;
+                curr_instr[tid].msgNode = value;
+                break;
+            // case 0xB: //Indicates the end of MPI_Send
+                // curr_instr[tid].isMsg = 0;
+                // curr_instr[tid].msgNode = 0;
+                // break;
+            case 0xC: //Indicates the start of MPI_Recv
+                curr_instr[tid].isMsg = 2;
+                curr_instr[tid].msgNode = value;
+                break;
+            // case 0xD: //Indicates the end of MPI_Recv
+                // curr_instr[tid].isMsg = 0;
+                // curr_instr[tid].msgNode = 0;
+                // break;
             default:
                 break;
 
@@ -749,6 +768,8 @@ static VOID Instruction(INS ins, VOID* v)
     //    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)pin_magic_inst, IARG_THREAD_ID, IARG_REG_VALUE, REG_RBX, IARG_REG_VALUE, REG_RCX, IARG_END);
     //    //INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)ROI_start, IARG_THREAD_ID, IARG_END);
     //}
+    // curr_instr[IARG_THREAD_ID].msgNode = 99;
+    INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)ResetCurrentInstruction, IARG_INST_PTR, IARG_THREAD_ID, IARG_END);
     if (INS_IsXchg(ins) && INS_OperandReg(ins, 0) == REG_RCX && INS_OperandReg(ins, 1) == REG_RCX) {
         //std::cout<<"(xchg rbx rbx caught)!"<<std::endl;
         INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)pin_magic_inst, IARG_THREAD_ID, IARG_REG_VALUE, REG_RBX, IARG_REG_VALUE, REG_RCX, IARG_END);
@@ -757,7 +778,7 @@ static VOID Instruction(INS ins, VOID* v)
 
     //getting champsim trace for just 1 thread
     //if(curtid==champsim_trace_tid){
-        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)ResetCurrentInstruction, IARG_INST_PTR, IARG_THREAD_ID, IARG_END);
+        // INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)ResetCurrentInstruction, IARG_INST_PTR, IARG_THREAD_ID, IARG_END); // commented by NCBS
         if(INS_IsBranch(ins))
             INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)BranchOrNot, IARG_BRANCH_TAKEN, IARG_THREAD_ID, IARG_END);
 
